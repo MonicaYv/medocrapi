@@ -28,4 +28,3 @@ async def send_email(recipient: str, subject: str, body: str):
     except Exception as e:
         print("EMAIL SEND ERROR:", e)
         raise
-

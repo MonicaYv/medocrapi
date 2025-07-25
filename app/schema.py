@@ -19,19 +19,29 @@ class OTPVerify(BaseModel):
     contact: str
     otp: str
 
-#final user creation
-class UserCreateFinal(BaseModel):
-    password: str
-    name: str 
-    user_type: str = "ngo"
+#user creation
+class UserCreate(BaseModel):
+    #name: str
+    email: EmailStr
+    #number
 
-# user table
 class UserOut(BaseModel):
     id: int
-    email: Optional[EmailStr] = None
-    mobile_number: Optional[str] = None
-    user_type: str
     name: str
-
+    email: EmailStr
+    is_active: bool
     class Config:
-        orm_mode = True 
+        orm_mode = True
+
+class UserLogin(BaseModel):
+    email: EmailStr
+
+class OTPVerify(BaseModel):
+    email: EmailStr
+    otp: str
+
+class UserRegisterWithOTP(BaseModel):
+    name: str
+    email: EmailStr
+    otp: str
+    otp_token: str  

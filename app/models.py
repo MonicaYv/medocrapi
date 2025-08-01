@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Date, Time, text, BigInteger
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Date, Time, text, BigInteger, ForeignKey
 from app.database import Base
 
 class UserProfile(Base):
@@ -9,6 +9,8 @@ class UserProfile(Base):
     last_name = Column(String, nullable=False)
     dob = Column(Date, nullable=True)
     gender = Column(String(16), nullable=True)
+    pan_card = Column(String, nullable=True, unique=True, index=True)
+    profile_photo = Column(String, nullable=True) 
     address = Column(String, nullable=True)
     city = Column(String, nullable=True)
     state = Column(String, nullable=True)
@@ -20,8 +22,8 @@ class UserProfile(Base):
     user_id = Column(BigInteger, nullable=True)
     age = Column(Integer, nullable=True)
     email = Column(String, unique=True, index=True, nullable=False)
-    phone_number = Column(String, unique=True, index=True, nullable=False)  # Matches phone_num in DB
-    otp_secret = Column(String, nullable=True)  # Store OTP secret for future logins
+    phone_number = Column(String, unique=True, index=True, nullable=False)  
+    otp_secret = Column(String, nullable=True) 
     created_at = Column(DateTime(timezone=True), server_default=text('now()'))
     updated_at = Column(DateTime(timezone=True), server_default=text('now()'), onupdate=text('now()'))
     inapp_notifications = Column(Boolean, server_default='true')
@@ -35,3 +37,18 @@ class UserProfile(Base):
     quite_mode_end_time = Column(Time, nullable=True)
     last_login = Column(DateTime(timezone=True), nullable=True)
     last_login_ip = Column(String, nullable=True)
+
+class UserAddress(Base):
+    __tablename__ = "UserAddress"
+
+    id = Column(Integer, primary_key=True, index=True)
+    address_type = Column(String)
+    first_name = Column(String)
+    last_name = Column(String)
+    phone_number = Column(String)
+    country = Column(String)
+    city = Column(String)
+    area = Column(String)
+    zip_code = Column(String)
+    address = Column(String)
+    user_id = Column(Integer, ForeignKey('UserProfile.id'))

@@ -1,19 +1,23 @@
-from fastapi import APIRouter, Header, Depends, status, HTTPException
+from fastapi import APIRouter, Header, Depends, status, HTTPException, UploadFile, File
+from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from passlib.context import CryptContext
 import asyncio
-from jose import jwt
+from jose import jwt, JWTError
+from fastapi.security import OAuth2PasswordBearer
 from datetime import datetime, timedelta
 import os, re
-from app.models import UserProfile
-from app.schemas import ContactInfo, RegisterFinal, VerifyLoginOTP, UserProfileOut, Token
+from app.models import UserProfile, UserAddress
+from app.schemas import ContactInfo, RegisterFinal, VerifyLoginOTP, UserProfileOut, UserProfileDetailOut, UpdateProfileRequest, Token, AddressCreate, AddressOut
 from app.otp_utils import generate_otp_secret, generate_otp, verify_otp
 from app.email_utils import send_email
 from app.database import get_db 
 from app.config import AUTHORIZATION_KEY, SECRET_KEY, ALGORITHM
+from app.file_utils import save_profile_photo, delete_profile_photo, get_profile_photo_url
 
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 router = APIRouter(
     prefix="/auth",
@@ -113,3 +117,181 @@ async def verify_login_and_get_token(data: VerifyLoginOTP, db: AsyncSession = De
     # Create a JWT token for the authenticated user
     access_token = create_access_token(data={"sub": user.email})
     return {"access_token": access_token, "token_type": "bearer"}
+
+def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(get_db)):
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        email: str = payload.get("sub")
+        if email is None:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+    except JWTError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+    return email
+
+async def get_current_user_object(current_user_email: str = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    query = select(UserProfile).where(UserProfile.email == current_user_email)
+    result = await db.execute(query)
+    user = result.scalars().first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user
+
+@router.get("/account_det", response_model=UserProfileDetailOut)
+async def get_account_details(current_user: UserProfile = Depends(get_current_user_object)):
+    return current_user
+
+@router.put("/update_profile", response_model=UserProfileDetailOut)
+async def update_profile(
+    profile_data: UpdateProfileRequest, 
+    current_user: UserProfile = Depends(get_current_user_object),
+    db: AsyncSession = Depends(get_db)
+):
+    # Update only provided fields
+    update_data = profile_data.dict(exclude_unset=True)
+    
+    for field, value in update_data.items():
+        if hasattr(current_user, field):
+            setattr(current_user, field, value)
+    
+    await db.commit()
+    await db.refresh(current_user)
+    return current_user
+
+@router.post("/add_pfp")
+async def add_profile_photo(
+    file: UploadFile = File(...),
+    current_user: UserProfile = Depends(get_current_user_object),
+    db: AsyncSession = Depends(get_db)
+):
+    if current_user.profile_photo:
+        raise HTTPException(status_code=400, detail="Profile photo already exists. Use update_pfp to change it.")
+    
+    file_path = save_profile_photo(file, current_user.id)
+    
+    current_user.profile_photo = file_path
+    await db.commit()
+    await db.refresh(current_user)
+    
+    return {
+        "message": "Profile photo uploaded successfully",
+        "profile_photo_url": get_profile_photo_url(file_path)
+    }
+
+@router.put("/update_pfp")
+async def update_profile_photo(
+    file: UploadFile = File(...),
+    current_user: UserProfile = Depends(get_current_user_object),
+    db: AsyncSession = Depends(get_db)
+):
+    if current_user.profile_photo:
+        delete_profile_photo(current_user.profile_photo)
+    
+    # Save new photo
+    file_path = save_profile_photo(file, current_user.id)
+    
+    # Update database
+    current_user.profile_photo = file_path
+    await db.commit()
+    await db.refresh(current_user)
+    
+    return {
+        "message": "Profile photo updated successfully",
+        "profile_photo_url": get_profile_photo_url(file_path)
+    }
+
+@router.delete("/remove_pfp")
+async def remove_profile_photo(
+    current_user: UserProfile = Depends(get_current_user_object),
+    db: AsyncSession = Depends(get_db)
+):
+    if not current_user.profile_photo:
+        raise HTTPException(status_code=404, detail="No profile photo found")
+    
+    delete_profile_photo(current_user.profile_photo)
+    
+    current_user.profile_photo = None
+    await db.commit()
+    
+    return {"message": "Profile photo removed successfully"}
+
+@router.post("/add_address", response_model=AddressOut)
+async def add_address(address_data: AddressCreate, current_user: UserProfile = Depends(get_current_user_object), db: AsyncSession = Depends(get_db)):
+    new_address = UserAddress(
+        address_type=address_data.address_type,
+        first_name=address_data.first_name,
+        last_name=address_data.last_name,
+        phone_number=address_data.phone_number,
+        country=address_data.country,
+        city=address_data.city,
+        area=address_data.area,
+        zip_code=address_data.zip_code,
+        address=address_data.address,
+        user_id=current_user.id
+    )
+    
+    db.add(new_address)
+    await db.commit()
+    await db.refresh(new_address)
+    return new_address
+
+@router.get("/address_list", response_model=list[AddressOut])
+async def get_address_list(current_user: UserProfile = Depends(get_current_user_object), db: AsyncSession = Depends(get_db)):
+    query = select(UserAddress).where(UserAddress.user_id == current_user.id)
+    result = await db.execute(query)
+    addresses = result.scalars().all()
+    return addresses
+
+@router.put("/update_address/{address_id}", response_model=AddressOut)
+async def update_address(
+    address_id: int,
+    address_data: AddressCreate,
+    current_user: UserProfile = Depends(get_current_user_object),
+    db: AsyncSession = Depends(get_db)
+):
+    # Check if address exists and belongs to current user
+    query = select(UserAddress).where(
+        UserAddress.id == address_id,
+        UserAddress.user_id == current_user.id
+    )
+    result = await db.execute(query)
+    address = result.scalars().first()
+    
+    if not address:
+        raise HTTPException(status_code=404, detail="Address not found")
+    
+    # Update address fields
+    address.address_type = address_data.address_type
+    address.first_name = address_data.first_name
+    address.last_name = address_data.last_name
+    address.phone_number = address_data.phone_number
+    address.country = address_data.country
+    address.city = address_data.city
+    address.area = address_data.area
+    address.zip_code = address_data.zip_code
+    address.address = address_data.address
+    
+    await db.commit()
+    await db.refresh(address)
+    return address
+
+@router.delete("/delete_address/{address_id}")
+async def delete_address(
+    address_id: int,
+    current_user: UserProfile = Depends(get_current_user_object),
+    db: AsyncSession = Depends(get_db)
+):
+    # Check if address exists and belongs to current user
+    query = select(UserAddress).where(
+        UserAddress.id == address_id,
+        UserAddress.user_id == current_user.id
+    )
+    result = await db.execute(query)
+    address = result.scalars().first()
+    
+    if not address:
+        raise HTTPException(status_code=404, detail="Address not found")
+    
+    await db.delete(address)
+    await db.commit()
+    
+    return {"message": "Address deleted successfully"}

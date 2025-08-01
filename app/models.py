@@ -1,5 +1,7 @@
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, Date, Time, text, BigInteger, ForeignKey
 from app.database import Base
+from sqlalchemy.orm import relationship
+from datetime import datetime
 
 class UserProfile(Base):
     __tablename__ = 'UserProfile'
@@ -52,3 +54,47 @@ class UserAddress(Base):
     zip_code = Column(String)
     address = Column(String)
     user_id = Column(Integer, ForeignKey('UserProfile.id'))
+
+
+class IssueType(Base):
+    __tablename__ = "support_issuetype"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, unique=True, index=True, nullable=False)
+
+    # One-to-many relationship
+    options = relationship("IssueOption", back_populates="issue_type")
+
+
+class IssueOption(Base):
+    __tablename__ = "support_issueoption"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)
+
+    issue_type_id = Column(Integer, ForeignKey("support_issuetype.id"), nullable=False)
+
+    # Many-to-one to IssueType
+    issue_type = relationship("IssueType", back_populates="options")
+
+    # One-to-many to SupportTicket
+    tickets = relationship("SupportTicket", back_populates="issue_option")  
+
+
+class SupportTicket(Base):
+    __tablename__ = "support_supportticket"
+
+    id = Column(Integer, primary_key=True, index=True)
+    description = Column(String)
+    image = Column(String, nullable=True)
+    status = Column(String, default="open")
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    created_by_id = Column(Integer, nullable=True)
+    issue_option_id = Column(Integer, ForeignKey("support_issueoption.id"))
+    user_id = Column(Integer, ForeignKey("UserProfile.id"))
+    assigned_to = Column(Integer, nullable=True)
+
+    # Correct relationship to IssueOption
+    issue_option = relationship("IssueOption", back_populates="tickets")

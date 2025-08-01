@@ -1,6 +1,8 @@
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from app.routers import user_auth
+from app.Help_center import help_center
+
 
 app = FastAPI(title="MedoCRM API")
 
@@ -8,6 +10,7 @@ app = FastAPI(title="MedoCRM API")
 app.mount("/static", StaticFiles(directory="app"), name="static")
 
 app.include_router(user_auth.router)
+app.include_router(help_center.router)
 
 @app.get("/")
 def root():

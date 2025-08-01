@@ -1,6 +1,7 @@
 from pydantic import BaseModel, EmailStr
 from typing import Optional
-from datetime import date
+from datetime import datetime, date
+from typing import Optional, List
 
 class Token(BaseModel):
     access_token: str
@@ -100,3 +101,46 @@ class AddressOut(UserAddress):
 
     class Config:   
         from_attributes = True
+
+
+#help center
+
+class IssueTypeBase(BaseModel):
+    name: str
+
+class IssueTypeOut(IssueTypeBase):
+    id: int
+
+    class Config:
+        orm_mode = True
+
+# --- For GET /api/issue_option?issue_type_id=1 ---
+class IssueOptionBase(BaseModel):
+    name: str
+    issue_type_id: int
+
+class IssueOptionOut(IssueOptionBase):
+    id: int
+
+    class Config:
+        orm_mode = True
+
+class SupportTicketBase(BaseModel):
+    description: str
+    image: Optional[str] = None
+    status: Optional[str] = "open"
+    created_by_id: int
+    issue_option_id: int
+    user_id: int
+    assigned_to: Optional[int] = None
+
+class SupportTicketCreate(SupportTicketBase):
+    pass
+
+class SupportTicketOut(SupportTicketBase):
+    id: int
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        orm_mode = True

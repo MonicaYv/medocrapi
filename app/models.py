@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Date, Time, text, BigInteger, ForeignKey
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Date, Time, text,Text, BigInteger, ForeignKey
 from app.database import Base
 from sqlalchemy.orm import relationship
 from datetime import datetime
@@ -98,3 +98,36 @@ class SupportTicket(Base):
 
     # Correct relationship to IssueOption
     issue_option = relationship("IssueOption", back_populates="tickets")
+
+
+class ChatSupport(Base):
+    __tablename__ = "support_chat"  # FIXED here ✅
+
+    id = Column(Integer, primary_key=True, index=True)
+    chat_session_id = Column(String, unique=True, index=True)
+    user_id = Column(Integer, ForeignKey("UserProfile.id"))
+    message = Column(Text, nullable=False)
+    sender_type = Column(String, nullable=False)  # 'user' or 'agent'
+    sender_id = Column(Integer, nullable=True)
+    session_status = Column(String, default="active")  # active, closed, waiting
+    priority = Column(String, default="normal")  # low, normal, high, urgent
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    is_read = Column(Boolean, default=False)
+    message_type = Column(String, default="text")  # text, image, file
+    attachment_url = Column(String, nullable=True)
+
+class FAQ(Base):
+    __tablename__ = "account_faq"
+
+    id = Column(Integer, primary_key=True, index=True)
+    question = Column(Text, nullable=False)
+    answer = Column(Text, nullable=False)
+    category = Column(String(100), nullable=True)
+    profile_type = Column(String(100), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    user_id = Column(Integer, ForeignKey("UserProfile.id"))  
+    # user = relationship("UserProfile", back_populates="faqs")  
+

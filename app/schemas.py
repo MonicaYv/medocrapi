@@ -144,3 +144,44 @@ class SupportTicketOut(SupportTicketBase):
 
     class Config:
         orm_mode = True
+
+
+class ChatSupportCreate(BaseModel):
+    chat_session_id: str
+    user_id: int
+    message: str
+    sender_type: str  # 'user' or 'agent'
+    sender_id: Optional[int] = None
+    session_status: Optional[str] = "active"
+    priority: Optional[str] = "normal"
+    message_type: Optional[str] = "text"
+    attachment_url: Optional[str] = None
+
+class ChatSupportOut(ChatSupportCreate):
+    id: int
+    created_at: datetime
+    updated_at: datetime
+    is_read: bool
+
+    class Config:
+        orm_mode = True
+
+class FAQBase(BaseModel):
+    question: str
+    answer: str
+    category: Optional[str] = None
+    profile_type: Optional[str] = None
+    user_id: Optional[int] = None
+
+class FAQOut(FAQBase):
+    id: int
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        orm_mode = True
+
+class FAQSearch(BaseModel):
+    keyword: Optional[str] = None
+    category: Optional[str] = None
+    profile_type: Optional[str] = None

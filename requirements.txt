@@ -5,7 +5,7 @@ asyncpg
 alembic
 passlib[bcrypt]
 pydantic
-python-jose[cryptography]
+pyjwt[crypto]
 pyotp
 aiosmtplib
 python-dotenv

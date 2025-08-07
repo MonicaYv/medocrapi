@@ -185,3 +185,66 @@ class FAQSearch(BaseModel):
     keyword: Optional[str] = None
     category: Optional[str] = None
     profile_type: Optional[str] = None
+
+
+# Email Support Schemas
+class EmailSupportCreate(BaseModel):
+    subject: str
+    message: str
+    priority: Optional[str] = "normal"
+
+class EmailSupportOut(BaseModel):
+    id: int
+    user_id: int
+    subject: str
+    message: str
+    email: str
+    status: str
+    priority: str
+    created_at: datetime
+    updated_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+class EmailSupportUpdateStatus(BaseModel):
+    status: str  # pending, replied, closed
+
+
+# Payment Methods Schemas
+class PaymentMethodCreate(BaseModel):
+    card_holder_name: str
+    card_number_masked: str  # e.g., "**** **** **** 1234"
+    card_type: str  # visa, mastercard, amex, etc.
+    expiry_month: int  # 1-12
+    expiry_year: int  # 2025, 2026, etc.
+    is_default: Optional[bool] = False
+    payment_gateway: Optional[str] = "stripe"
+
+class PaymentMethodUpdate(BaseModel):
+    card_holder_name: Optional[str] = None
+    expiry_month: Optional[int] = None
+    expiry_year: Optional[int] = None
+    is_default: Optional[bool] = None
+
+class PaymentMethodOut(BaseModel):
+    id: int
+    user_id: int
+    card_holder_name: str
+    card_number_masked: str
+    card_type: str
+    expiry_month: int
+    expiry_year: int
+    is_default: bool
+    payment_gateway: str
+    status: str
+    created_at: datetime
+    updated_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+# Points and Badges Schemas
+
+class PointsBadgeCreate(BaseModel):
+    name: str

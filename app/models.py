@@ -131,3 +131,48 @@ class FAQ(Base):
     user_id = Column(Integer, ForeignKey("UserProfile.id"))  
     # user = relationship("UserProfile", back_populates="faqs")  
 
+class EmailSupport(Base):
+    __tablename__ = "support_email"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("UserProfile.id"))
+    subject = Column(String, nullable=False)
+    message = Column(String, nullable=False)
+    email = Column(String, nullable=False)  # User's email
+    status = Column(String, default="pending")  # pending, replied, closed
+    priority = Column(String, default="normal")  # low, normal, high, urgent
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationship
+    user = relationship("UserProfile")
+    
+
+class PaymentMethod(Base):
+    __tablename__ = "payment_methods"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("UserProfile.id"))
+    card_holder_name = Column(String, nullable=False)
+    card_number_masked = Column(String, nullable=False)  # e.g., "**** **** **** 1234"
+    card_type = Column(String, nullable=False)  # visa, mastercard, amex, etc.
+    expiry_month = Column(Integer, nullable=False)  # 1-12
+    expiry_year = Column(Integer, nullable=False)  # 2025, 2026, etc.
+    is_default = Column(Boolean, default=False)
+    payment_gateway = Column(String, default="stripe")  # stripe, razorpay, etc.
+    status = Column(String, default="active")  # active, expired, deleted
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationship
+    user = relationship("UserProfile")
+
+
+class PointsBadge(Base):
+    __tablename__ = "points_pointsbadge"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False, unique=True)
+    min_points = Column(Integer, nullable=False)
+    max_points = Column(Integer, nullable=False)
+    description = Column(String, nullable=True)
+    image_url = Column(String, nullable=True)  # URL to the badge image

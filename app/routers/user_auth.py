@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from passlib.context import CryptContext
 import asyncio
-from jose import jwt, JWTError
+import jwt
 from fastapi.security import OAuth2PasswordBearer
 from datetime import datetime, timedelta
 import os, re
@@ -14,7 +14,7 @@ from app.otp_utils import generate_otp_secret, generate_otp, verify_otp
 from app.email_utils import send_email
 from app.database import get_db 
 from app.config import AUTHORIZATION_KEY, SECRET_KEY, ALGORITHM
-from app.file_utils import save_profile_photo, delete_profile_photo, get_profile_photo_url
+
 
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
@@ -124,7 +124,7 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession = Dep
         email: str = payload.get("sub")
         if email is None:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
-    except JWTError:
+    except jwt.InvalidTokenError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
     return email
 
@@ -136,83 +136,6 @@ async def get_current_user_object(current_user_email: str = Depends(get_current_
         raise HTTPException(status_code=404, detail="User not found")
     return user
 
-@router.get("/account_det", response_model=UserProfileDetailOut)
-async def get_account_details(current_user: UserProfile = Depends(get_current_user_object)):
-    return current_user
-
-@router.put("/update_profile", response_model=UserProfileDetailOut)
-async def update_profile(
-    profile_data: UpdateProfileRequest, 
-    current_user: UserProfile = Depends(get_current_user_object),
-    db: AsyncSession = Depends(get_db)
-):
-    # Update only provided fields
-    update_data = profile_data.dict(exclude_unset=True)
-    
-    for field, value in update_data.items():
-        if hasattr(current_user, field):
-            setattr(current_user, field, value)
-    
-    await db.commit()
-    await db.refresh(current_user)
-    return current_user
-
-@router.post("/add_pfp")
-async def add_profile_photo(
-    file: UploadFile = File(...),
-    current_user: UserProfile = Depends(get_current_user_object),
-    db: AsyncSession = Depends(get_db)
-):
-    if current_user.profile_photo:
-        raise HTTPException(status_code=400, detail="Profile photo already exists. Use update_pfp to change it.")
-    
-    file_path = save_profile_photo(file, current_user.id)
-    
-    current_user.profile_photo = file_path
-    await db.commit()
-    await db.refresh(current_user)
-    
-    return {
-        "message": "Profile photo uploaded successfully",
-        "profile_photo_url": get_profile_photo_url(file_path)
-    }
-
-@router.put("/update_pfp")
-async def update_profile_photo(
-    file: UploadFile = File(...),
-    current_user: UserProfile = Depends(get_current_user_object),
-    db: AsyncSession = Depends(get_db)
-):
-    if current_user.profile_photo:
-        delete_profile_photo(current_user.profile_photo)
-    
-    # Save new photo
-    file_path = save_profile_photo(file, current_user.id)
-    
-    # Update database
-    current_user.profile_photo = file_path
-    await db.commit()
-    await db.refresh(current_user)
-    
-    return {
-        "message": "Profile photo updated successfully",
-        "profile_photo_url": get_profile_photo_url(file_path)
-    }
-
-@router.delete("/remove_pfp")
-async def remove_profile_photo(
-    current_user: UserProfile = Depends(get_current_user_object),
-    db: AsyncSession = Depends(get_db)
-):
-    if not current_user.profile_photo:
-        raise HTTPException(status_code=404, detail="No profile photo found")
-    
-    delete_profile_photo(current_user.profile_photo)
-    
-    current_user.profile_photo = None
-    await db.commit()
-    
-    return {"message": "Profile photo removed successfully"}
 
 @router.post("/add_address", response_model=AddressOut)
 async def add_address(address_data: AddressCreate, current_user: UserProfile = Depends(get_current_user_object), db: AsyncSession = Depends(get_db)):

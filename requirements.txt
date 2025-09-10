@@ -12,3 +12,4 @@ python-dotenv
 email-validator
 motor
 python-multipart
+dotenv

@@ -78,9 +78,11 @@ class UpdateProfileRequest(BaseModel):
     inapp_notifications: Optional[bool] = None
     email_notifications: Optional[bool] = None
     push_notifications: Optional[bool] = None
-    regulatory_alerts: Optional[bool] = None
     promotions_and_offers: Optional[bool] = None
     quite_mode: Optional[bool] = None
+
+# Alias for backward compatibility
+UserProfileUpdate = UpdateProfileRequest
 
 class UserAddress(BaseModel):
     address_type: str
@@ -248,3 +250,190 @@ class PaymentMethodOut(BaseModel):
 
 class PointsBadgeCreate(BaseModel):
     name: str
+    min_points: Optional[int] = None
+    max_points: Optional[int] = None
+    description: Optional[str] = None
+    image_url: Optional[str] = None
+
+class PointsBadgeOut(BaseModel):
+    id: int
+    name: str
+    min_points: Optional[int] = None
+    max_points: Optional[int] = None
+    description: Optional[str] = None
+    image_url: Optional[str] = None
+    
+    class Config:
+        from_attributes = True
+
+class CouponHistoryCreate(BaseModel):
+    id: Optional[int] = None
+    date_claimed: Optional[datetime] = datetime.utcnow()
+    expiry_date: datetime
+    coupon_id: str
+    user_id: int
+
+class CouponHistoryOut(BaseModel):
+    id: int
+    date_claimed: datetime
+    expiry_date: datetime   
+    coupon_id: str
+    user_id: int
+
+    class Config:
+        from_attributes = True
+
+class PointsActionTypeCreate(BaseModel):
+    action_type: str
+    default_points: int
+
+class PointsActionTypeOut(BaseModel):
+    id: int
+    action_type: str
+    default_points: int
+
+    class Config:
+        from_attributes = True
+
+# Reward History Schemas
+class RewardHistoryCreate(BaseModel):
+    user_id: int
+    action_type_id: int
+    points: int
+
+class RewardHistoryOut(BaseModel):
+    id: int
+    user_id: int
+    action_type_id: int
+    points: int
+    timestamp: datetime
+    action_type: Optional[PointsActionTypeOut] = None  # For joined queries
+
+    class Config:
+        from_attributes = True
+
+# Request schema for reward history API with filters
+class RewardHistoryFilter(BaseModel):
+    action_type_id: Optional[int] = None
+    start_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None
+    limit: Optional[int] = 50
+    offset: Optional[int] = 0
+
+# Doctor Profile Schemas
+class DoctorProfileCreate(BaseModel):
+    first_name: str
+    last_name: str
+    gender: str
+    age: int
+    specialties: str
+
+class DoctorProfileUpdate(BaseModel):
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    gender: Optional[str] = None
+    age: Optional[int] = None
+    specialties: Optional[str] = None
+
+class DoctorProfileOut(BaseModel):
+    id: int
+    user_id: int
+    first_name: str
+    last_name: str
+    gender: str
+    age: int
+    specialties: str
+
+    class Config:
+        from_attributes = True
+
+class HealthIssueOut(BaseModel):
+    id: int
+    name: str
+
+    class Config:
+        from_attributes = True
+    
+
+class DonationTypes(BaseModel):
+    id: int
+    name: str
+    is_active: bool
+
+    class Config:
+        from_attributes = True
+
+class DonationPost(BaseModel):
+    id: int
+    header: str
+    description: str
+    tags: List[str]
+
+    class Config:
+        from_attributes = True
+
+# Donation History Schemas
+class DonationOut(BaseModel):
+    id: int
+    amount: int
+    order_id: int
+    payment_date: datetime
+    gst: int
+    platform_fee: int
+    amount_to_ngo: int
+    transaction_id: str
+    payment_method: str
+    pan_number: str
+    pan_document: str
+    payment_status: str
+    created_at: datetime
+    ngopost_id: int
+    user_id: int
+    saved: bool
+
+    class Config:
+        from_attributes = True
+
+class DonationHistoryFilter(BaseModel):
+    payment_status: Optional[str] = None
+    payment_method: Optional[str] = None
+    start_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None
+    min_amount: Optional[int] = None
+    max_amount: Optional[int] = None
+    limit: Optional[int] = 50
+    offset: Optional[int] = 0
+
+# Donation Bill Schema
+class DonationBillOut(BaseModel):
+    # Receipt Details
+    receipt_no: str
+    date: str
+    ngo_name: str
+    ngo_pan: str = "AABC14567D"  # Static for now
+    ngo_80g_reg_no: str = "80G/98765/2023-24"  # Static for now
+    ngo_address: str = "45-A, Lajpat Nagar, New Delhi - 110024"  # Static for now
+    
+    # Donor Details
+    donor_name: str
+    donor_email: str
+    donor_pan: Optional[str] = None
+    
+    # Payment Details
+    amount_donated: int
+    mode_of_payment: str
+    reference_no: str
+    
+    # Additional Details
+    purpose_of_donation: str
+    eligible_for_80g_deduction: bool = True
+    amount_in_words: str
+    
+    # Acknowledgment
+    receipt_acknowledgment: str = "This receipt acknowledges that we have received the above-mentioned donation voluntarily. Thank you for your support."
+    authorized_signatory: str = "Authorized Signatory"
+    organization_name: str = "Jeevan Prakash Foundation"  # Static for now
+
+    class Config:
+        from_attributes = True
+    

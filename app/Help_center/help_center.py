@@ -3,18 +3,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from typing import List, Optional
 import time
-from sqlalchemy.orm import selectinload
-from app.database import SessionLocal
-from app.models import IssueType, IssueOption, ChatSupport, FAQ, EmailSupport 
-from app.schemas import IssueTypeOut, IssueOptionOut
+import asyncio
+from app.database import get_db, SessionLocal
+from app.models import IssueType, IssueOption, ChatSupport, FAQ, EmailSupport, UserProfile, SupportTicket
+from app.schemas import (
+    IssueTypeOut, IssueOptionOut, SupportTicketCreate, SupportTicketOut, 
+    ChatSupportCreate, ChatSupportOut, EmailSupportCreate, EmailSupportOut, 
+    EmailSupportUpdateStatus, FAQOut
+)
 from app.config import AUTHORIZATION_KEY, SECRET_KEY, ALGORITHM
-from app.database import get_db
-from app.models import SupportTicket
-from app.schemas import SupportTicketCreate, SupportTicketOut, ChatSupportCreate, ChatSupportOut, EmailSupportCreate, EmailSupportOut, EmailSupportUpdateStatus
 from fastapi.security import OAuth2PasswordBearer
-from jose import jwt, JWTError
-from ..models import FAQ
-from ..schemas import FAQOut, FAQSearch
+import jwt
+from jwt.exceptions import PyJWTError as JWTError
 from app.routers.user_auth import get_current_user_object
 from app.email_utils import send_email
 
@@ -83,14 +83,6 @@ async def create_support_ticket(
     _auth=Depends(check_authorization_key),
     _user=Depends(get_current_user)
 ):
-    new_ticket = SupportTicket(**ticket.dict())
-    db.add(new_ticket)
-    await db.commit()
-    await db.refresh(new_ticket)
-    return new_ticket
-
-@router.post("/create_support_ticket", response_model=SupportTicketOut)
-async def create_support_ticket(ticket: SupportTicketCreate, db: AsyncSession = Depends(get_db)):
     new_ticket = SupportTicket(**ticket.dict())
     db.add(new_ticket)
     await db.commit()

@@ -146,7 +146,7 @@ class EmailSupport(Base):
     
     # Relationship
     user = relationship("UserProfile")
-    
+
 
 class PaymentMethod(Base):
     __tablename__ = "payment_methods"
@@ -159,7 +159,7 @@ class PaymentMethod(Base):
     expiry_month = Column(Integer, nullable=False)  # 1-12
     expiry_year = Column(Integer, nullable=False)  # 2025, 2026, etc.
     is_default = Column(Boolean, default=False)
-    payment_gateway = Column(String, default="stripe")  # stripe, razorpay, etc.
+    payment_gateway = Column(String, default="razorpay")  
     status = Column(String, default="active")  # active, expired, deleted
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -172,7 +172,136 @@ class PointsBadge(Base):
     __tablename__ = "points_pointsbadge"
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False, unique=True)
-    min_points = Column(Integer, nullable=False)
-    max_points = Column(Integer, nullable=False)
+    min_points = Column(Integer, nullable=True) 
+    max_points = Column(Integer, nullable=True)  
     description = Column(String, nullable=True)
-    image_url = Column(String, nullable=True)  # URL to the badge image
+    image_url = Column(String, nullable=True) 
+
+class CouponHistory(Base):
+    __tablename__ = "points_couponclaimed"
+    id = Column(Integer, primary_key=True, index=True)
+    date_claimed = Column(DateTime, default=datetime.utcnow)
+    expiry_date = Column(DateTime, nullable=False)
+    coupon_id = Column(String, nullable=False)
+    user_id = Column(Integer, ForeignKey("UserProfile.id"))
+
+    # Relationship
+    user = relationship("UserProfile")
+
+class PointsActionType(Base):
+    __tablename__ = "points_pointsactiontypes"
+    id = Column(Integer, primary_key=True, index=True)
+    action_type = Column(String, nullable=False, unique=False)
+    default_points = Column(Integer, nullable=False)
+
+    # Relationship
+    points = relationship("RewardHistory", back_populates="action_type")
+
+class RewardHistory(Base):
+    __tablename__ = "points_pointshistory"
+    id = Column(Integer, primary_key=True, index=True)
+    points = Column(Integer, nullable=False)
+    timestamp = Column(DateTime, default=datetime.utcnow)
+    action_type_id = Column(Integer, ForeignKey("points_pointsactiontypes.id"))
+    user_id = Column(Integer, ForeignKey("UserProfile.id"))
+
+    # Relationship
+    action_type = relationship("PointsActionType", back_populates="points")
+
+class PatientProfile(Base):
+    __tablename__ = "patient_profile"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("UserProfile.id"))
+    first_name = Column(String, nullable=False)
+    last_name = Column(String, nullable=False)
+    gender = Column(String, nullable=False)
+    age = Column(Integer, nullable=False)
+    relation = Column(String, nullable=False)
+
+    # Relationship
+    user = relationship("UserProfile")
+
+class DoctorProfile(Base):
+    __tablename__ = "doctor_profile"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("UserProfile.id"))
+    first_name = Column(String, nullable=False)
+    last_name = Column(String, nullable=False)
+    gender = Column(String, nullable=False)
+    age = Column(Integer, nullable=False)
+    specialties = Column(String, nullable=False)
+
+    # Relationship
+    user = relationship("UserProfile")
+
+class HealthIssues(Base):
+    __tablename__ = "health_issues"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False, unique=True)
+    
+
+class DonationTypes(Base):
+    __tablename__ = "ngopost_posttypeoption"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False, unique=True)
+    is_active = Column(Boolean, default=True)
+
+    # Relationship
+    posts = relationship("DonationPost", back_populates="post_type")
+
+class DonationPost(Base):
+    __tablename__ = "ngopost_ngopost"
+    id = Column(Integer, primary_key=True, index=True)
+    header = Column(String, nullable=False)
+    description = Column(String, nullable=False)
+    tags = Column(String, nullable=True)  # Comma-separated tags
+    post_type_id = Column(Integer, ForeignKey("ngopost_posttypeoption.id"))
+    donation_frequency = Column(String, nullable=True)
+    target_donation = Column(Integer, nullable=False)
+    donation_received = Column(Integer, nullable=False, default=0)
+    country_id = Column(Integer, nullable=False)
+    state_id = Column(Integer, nullable=False)
+    city_id = Column(Integer, nullable=False)
+    pincode = Column(String, nullable=False)
+    age_group_id = Column(Integer, nullable=False)
+    gender_id = Column(Integer, nullable=False)
+    spending_power_id = Column(Integer, nullable=False)
+    start_date = Column(DateTime, nullable=False)
+    end_date = Column(DateTime, nullable=False)
+    status = Column(String, nullable=False)
+    creative1 = Column(String, nullable=True)
+    creative2 = Column(String, nullable=True)
+    views = Column(Integer, nullable=False, default=0)
+    saved = Column(Boolean, default=False)
+    last_downloaded = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    user_id = Column(Integer, ForeignKey("UserProfile.id"))
+
+    # Relationship
+    user = relationship("UserProfile")
+    post_type = relationship("DonationTypes")
+    
+
+class Donation(Base):
+    __tablename__ = "donate_donation"
+    id = Column(Integer, primary_key=True, index=True)
+    amount = Column(Integer, nullable=False)
+    order_id = Column(Integer, nullable=False)
+    payment_date = Column(DateTime, nullable=False)
+    gst = Column(Integer, nullable=False)
+    platform_fee = Column(Integer, nullable=False)
+    amount_to_ngo = Column(Integer, nullable=False)
+    transaction_id = Column(String, nullable=False)
+    payment_method = Column(String, nullable=False)
+    pan_number = Column(String, nullable=False)
+    pan_document = Column(String, nullable=False)
+    payment_status = Column(String, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    ngopost_id = Column(Integer, ForeignKey("ngopost_ngopost.id"))
+    user_id = Column(Integer, ForeignKey("UserProfile.id"))
+    saved = Column(Boolean, default=False)
+
+    # Relationship
+    user = relationship("UserProfile")
+    ngo_post = relationship("DonationPost")

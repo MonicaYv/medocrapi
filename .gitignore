@@ -1,1 +1,6 @@
 .env
+app/uploads/
+venv/
+__pycache__/
+*.pyc
+venv/*

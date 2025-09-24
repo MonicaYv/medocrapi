@@ -114,7 +114,8 @@ class IssueTypeOut(IssueTypeBase):
     id: int
 
     class Config:
-        orm_mode = True
+        from_attributes = True
+        # orm_mode = True
 
 # --- For GET /api/issue_option?issue_type_id=1 ---
 class IssueOptionBase(BaseModel):
@@ -125,7 +126,8 @@ class IssueOptionOut(IssueOptionBase):
     id: int
 
     class Config:
-        orm_mode = True
+        # orm_mode = True
+        from_attributes = True
 
 class SupportTicketBase(BaseModel):
     description: str
@@ -145,7 +147,8 @@ class SupportTicketOut(SupportTicketBase):
     updated_at: datetime
 
     class Config:
-        orm_mode = True
+        # orm_mode = True
+        from_attributes = True
 
 
 class ChatSupportCreate(BaseModel):
@@ -166,7 +169,8 @@ class ChatSupportOut(ChatSupportCreate):
     is_read: bool
 
     class Config:
-        orm_mode = True
+        # orm_mode = True
+        from_attributes = True
 
 class FAQBase(BaseModel):
     question: str
@@ -181,7 +185,8 @@ class FAQOut(FAQBase):
     updated_at: datetime
 
     class Config:
-        orm_mode = True
+        # orm_mode = True
+        from_attributes = True
 
 class FAQSearch(BaseModel):
     keyword: Optional[str] = None
@@ -406,13 +411,12 @@ class DonationHistoryFilter(BaseModel):
 
 # Donation Bill Schema
 class DonationBillOut(BaseModel):
-    # Receipt Details
     receipt_no: str
     date: str
     ngo_name: str
-    ngo_pan: str = "AABC14567D"  # Static for now
-    ngo_80g_reg_no: str = "80G/98765/2023-24"  # Static for now
-    ngo_address: str = "45-A, Lajpat Nagar, New Delhi - 110024"  # Static for now
+    ngo_pan: str = "AABC14567D"
+    ngo_80g_reg_no: str = "80G/98765/2023-24"
+    ngo_address: str = "45-A, Lajpat Nagar, New Delhi - 110024"
     
     # Donor Details
     donor_name: str
@@ -432,7 +436,7 @@ class DonationBillOut(BaseModel):
     # Acknowledgment
     receipt_acknowledgment: str = "This receipt acknowledges that we have received the above-mentioned donation voluntarily. Thank you for your support."
     authorized_signatory: str = "Authorized Signatory"
-    organization_name: str = "Jeevan Prakash Foundation"  # Static for now
+    organization_name: str = "Jeevan Prakash Foundation"
 
     class Config:
         from_attributes = True

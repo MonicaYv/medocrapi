@@ -1,13 +1,13 @@
 from fastapi import APIRouter, Header, Depends, status, HTTPException, UploadFile, File
-from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from passlib.context import CryptContext
 import asyncio
 import jwt
+import re
 from fastapi.security import OAuth2PasswordBearer
 from datetime import datetime, timedelta
-import os, re
+from passlib.hash import pbkdf2_sha256
+import random, string
 from app.models import UserProfile, UserAddress
 from app.schemas import ContactInfo, RegisterFinal, VerifyLoginOTP, UserProfileOut, UserProfileDetailOut, UpdateProfileRequest, Token, AddressCreate, AddressOut
 from app.otp_utils import generate_otp_secret, generate_otp, verify_otp
@@ -26,6 +26,11 @@ router = APIRouter(
 
 def is_email(contact: str) -> bool:
     return bool(re.match(r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$', contact))
+
+def generate_random_string(length_min=8, length_max=10):
+    length = random.randint(length_min, length_max)
+    raw_password = ''.join(random.choices(string.ascii_letters + string.digits, k=length))
+    return pbkdf2_sha256.hash(raw_password)
 
 def create_access_token(data: dict, expires_delta: timedelta = None):
     to_encode = data.copy()
@@ -67,9 +72,11 @@ async def register_user(data: RegisterFinal, db: AsyncSession = Depends(get_db),
     new_user = UserProfile(
         first_name=data.first_name,
         last_name=data.last_name,
+        user_type='user',
         email=data.email,
         phone_number=data.phone_number,
-        otp_secret=data.otp_token,
+        phone_country_code='+91',
+        password = generate_random_string(),
         is_active=True,
         gender=data.gender,
         age=data.age

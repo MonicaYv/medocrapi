@@ -1,60 +1,76 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Date, Time, text,Text, BigInteger, ForeignKey
+from sqlalchemy import (
+    Column,
+    Integer,
+    String,
+    Boolean,
+    DateTime,
+    Date, Time,
+    Text,
+    ForeignKey
+)
+import datetime
 from app.database import Base
-from sqlalchemy.orm import relationship
-from datetime import datetime
+from sqlalchemy.orm import relationship, declarative_base
 
-class UserProfile(Base):
-    __tablename__ = 'UserProfile'
+Base = declarative_base()
 
+class User(Base):
+    __tablename__ = "registration_user"
     id = Column(Integer, primary_key=True, index=True)
-    first_name = Column(String, nullable=False)
-    last_name = Column(String, nullable=False)
-    dob = Column(Date, nullable=True)
-    gender = Column(String(16), nullable=True)
-    pan_card = Column(String, nullable=True, unique=True, index=True)
-    profile_photo = Column(String, nullable=True) 
-    address = Column(String, nullable=True)
-    city = Column(String, nullable=True)
-    state = Column(String, nullable=True)
-    pincode = Column(String, nullable=True)
-    country = Column(String, nullable=True)
-    referral_code = Column(String, nullable=True)
-    otp = Column(String, nullable=True)
-    email_otp = Column(String, nullable=True)
-    user_id = Column(BigInteger, nullable=True)
-    age = Column(Integer, nullable=True)
-    email = Column(String, unique=True, index=True, nullable=False)
-    phone_number = Column(String, unique=True, index=True, nullable=False)  
-    otp_secret = Column(String, nullable=True) 
-    created_at = Column(DateTime(timezone=True), server_default=text('now()'))
-    updated_at = Column(DateTime(timezone=True), server_default=text('now()'), onupdate=text('now()'))
-    inapp_notifications = Column(Boolean, server_default='true')
-    email_notifications = Column(Boolean, server_default='true')
-    push_notifications = Column(Boolean, server_default='true')
-    regulatory_alerts = Column(Boolean, server_default='true')
-    promotions_and_offers = Column(Boolean, server_default='true')
-    is_active = Column(Boolean, server_default='true')
-    quite_mode = Column(Boolean, server_default='false')
+    email = Column(String(254), unique=True, nullable=False)
+    phone_country_code = Column(String(8), nullable=True)
+    phone_number = Column(String(20), nullable=True)
+    password = Column(String(255), nullable=False)
+    user_type = Column(String(32), nullable=False)
+    created_at = Column(DateTime, nullable=False)
+    updated_at = Column(DateTime, nullable=False)
+    inapp_notifications = Column(Boolean, default=True)
+    email_notifications = Column(Boolean, default=True)
+    push_notifications = Column(Boolean, default=True)
+    regulatory_alerts = Column(Boolean, default=True)
+    promotions_and_offers = Column(Boolean, default=True)
+    quite_mode = Column(Boolean, default=False)
     quite_mode_start_time = Column(Time, nullable=True)
     quite_mode_end_time = Column(Time, nullable=True)
-    last_login = Column(DateTime(timezone=True), nullable=True)
-    last_login_ip = Column(String, nullable=True)
+    is_active = Column(Boolean, default=True)
+    last_login = Column(DateTime, nullable=True)
+    last_login_ip = Column(String, nullable=True, default=None)
+    
+    profile = relationship("UserProfile", back_populates="user", uselist=False)
+
+class UserProfile(Base):
+    __tablename__ = "registration_userprofile"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("registration_user.id", ondelete="CASCADE"))
+    first_name = Column(String(255), nullable=False)
+    last_name = Column(String(255), nullable=True)
+    age = Column(Integer, nullable=True)
+    dob = Column(Date, nullable=True)
+    gender = Column(String(16), nullable=True)
+    pan_number = Column(String(32), nullable=True)
+    profile_photo_path = Column(String(255), nullable=True)
+    referral_code = Column(String(64), nullable=True)
+    otp = Column(String(16), nullable=True)
+    
+    user = relationship("User", back_populates="profile")
+    addresses = relationship("UserAddress", back_populates="user_profile", cascade="all, delete")
 
 class UserAddress(Base):
-    __tablename__ = "UserAddress"
+    __tablename__ = "registration_useraddress"
 
     id = Column(Integer, primary_key=True, index=True)
-    address_type = Column(String)
-    first_name = Column(String)
-    last_name = Column(String)
-    phone_number = Column(String)
-    country = Column(String)
-    city = Column(String)
-    area = Column(String)
-    zip_code = Column(String)
-    address = Column(String)
-    user_id = Column(Integer, ForeignKey('UserProfile.id'))
-
+    user_profile_id = Column(Integer, ForeignKey("user_profiles.id", ondelete="CASCADE"))
+    address_type = Column(String(64), nullable=True)
+    first_name = Column(String(255), nullable=False)
+    last_name = Column(String(255), nullable=True)
+    phone_number = Column(String(20), nullable=True)
+    country = Column(String(128), nullable=True)
+    city = Column(String(128), nullable=True)
+    state = Column(String(128), nullable=True)
+    pincode = Column(String(20), nullable=True)
+    address = Column(String, nullable=True)
+    
+    user_profile = relationship("UserProfile", back_populates="addresses")
 
 class IssueType(Base):
     __tablename__ = "support_issuetype"
@@ -64,7 +80,6 @@ class IssueType(Base):
 
     # One-to-many relationship
     options = relationship("IssueOption", back_populates="issue_type")
-
 
 class IssueOption(Base):
     __tablename__ = "support_issueoption"
@@ -79,7 +94,6 @@ class IssueOption(Base):
 
     # One-to-many to SupportTicket
     tickets = relationship("SupportTicket", back_populates="issue_option")  
-
 
 class SupportTicket(Base):
     __tablename__ = "support_supportticket"
@@ -98,7 +112,6 @@ class SupportTicket(Base):
 
     # Correct relationship to IssueOption
     issue_option = relationship("IssueOption", back_populates="tickets")
-
 
 class ChatSupport(Base):
     __tablename__ = "support_chat"  # FIXED here ✅
@@ -147,7 +160,6 @@ class EmailSupport(Base):
     # Relationship
     user = relationship("UserProfile")
 
-
 class PaymentMethod(Base):
     __tablename__ = "payment_methods"
     
@@ -166,7 +178,6 @@ class PaymentMethod(Base):
     
     # Relationship
     user = relationship("UserProfile")
-
 
 class PointsBadge(Base):
     __tablename__ = "points_pointsbadge"
@@ -239,7 +250,6 @@ class HealthIssues(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False, unique=True)
     
-
 class DonationTypes(Base):
     __tablename__ = "ngopost_posttypeoption"
     id = Column(Integer, primary_key=True, index=True)
@@ -282,7 +292,6 @@ class DonationPost(Base):
     user = relationship("UserProfile")
     post_type = relationship("DonationTypes")
     
-
 class Donation(Base):
     __tablename__ = "donate_donation"
     id = Column(Integer, primary_key=True, index=True)

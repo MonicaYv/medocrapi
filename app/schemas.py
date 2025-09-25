@@ -1,6 +1,7 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, conint, condecimal
+
 from typing import Optional
-from datetime import datetime, date
+from datetime import datetime, date, time
 from typing import Optional, List
 
 class Token(BaseModel):
@@ -441,3 +442,172 @@ class DonationBillOut(BaseModel):
     class Config:
         from_attributes = True
     
+
+class BrandOptionOut(BaseModel):
+    id: int
+    name: str
+    is_active: bool
+
+    class Config:
+        orm_mode = True
+
+
+class CategoryOptionOut(BaseModel):
+    id: int
+    name: str
+    is_active: bool
+
+    class Config:
+        orm_mode = True
+
+
+
+class OffertypeOptionOut(BaseModel):
+    id: int
+    name: str
+    is_active: bool
+
+    class Config:
+        orm_mode = True
+
+
+class CouponBase(BaseModel):
+    id: int
+    title: str
+    description: str
+    code: str
+    category_id: int
+    brand_name_id: int
+    offer_type_id: int
+    max_redemptions: int
+    validity:date
+    image: Optional[str] = None
+    redeemed_count: int
+    displays_per_coupon: int
+    rate_per_display: float
+
+    class Config:
+        orm_mode = True
+
+
+
+class RedeemCouponRequest(BaseModel):
+    coupon_id: str
+    expiry_date: date
+    user_id: int
+
+
+
+class CouponHistoryResponse(BaseModel):
+    id: int
+    coupon_id: int
+    user_id: int
+    date_claimed: datetime
+    expiry_date: date
+
+    class Config:
+        orm_mode = True
+
+
+class UserProfileUpdate(BaseModel):
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    dob: Optional[date] = None
+    gender: Optional[str] = None
+    pan_card: Optional[str] = None
+    address: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
+    pincode: Optional[str] = None
+    country: Optional[str] = None
+    age: Optional[int] = None
+    inapp_notifications: Optional[bool] = None
+    email_notifications: Optional[bool] = None
+    push_notifications: Optional[bool] = None
+    regulatory_alerts: Optional[bool] = None
+    promotions_and_offers: Optional[bool] = None
+    quite_mode: Optional[bool] = None
+
+# patient profile schemas
+
+
+# Create Patient (input)
+
+
+class PatientProfileBase(BaseModel):
+    first_name: str
+    last_name: str
+    gender: str
+    age: int
+    relation: str
+
+
+# ---------- Create ----------
+class PatientProfileCreate(PatientProfileBase):
+    pass   # All fields come from base, user_id will be added from current user
+
+
+# ---------- Update ----------
+class PatientProfileUpdate(BaseModel):
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    gender: Optional[str] = None
+    age: Optional[int] = None
+    relation: Optional[str] = None
+
+
+# ---------- Response ----------
+class PatientProfileResponse(PatientProfileBase):
+    id: int
+    user_id: int
+
+    class Config:
+        orm_mode = True
+
+
+# medicine
+class WishlistMedicineCreate(BaseModel):
+    medicine_mongo_id: str
+    quantity: Optional[int] = 1
+    is_favorite: Optional[bool] = False
+
+
+class WishlistMedicineOut(BaseModel):
+    id: int
+    user_id: int
+    medicine_mongo_id: str
+    quantity: int
+    is_favorite: bool
+    created_at: datetime
+    medicine_details: Optional[dict] = None  # from MongoDB
+
+    class Config:
+        orm_mode = True
+
+
+
+
+class DoctorAppointmentOut(BaseModel):
+    id: int
+    doctor_id: str
+    name: str
+    specialization: Optional[str]
+    experience_years: Optional[int]
+    gender: Optional[str]
+    rating: Optional[float]
+    order_id: str
+    appointment_date: date
+    appointment_start_time: time
+    appointment_end_time: time
+    created_at: Optional[datetime]
+    location: Optional[str]
+    distance_km: Optional[float]
+    travel_time_mins: Optional[int]
+    clinic_fee: Optional[float]
+    home_fee: Optional[float]
+    status: str
+
+    class Config:
+        orm_mode = True
+
+

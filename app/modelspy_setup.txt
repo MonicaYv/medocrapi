@@ -1,0 +1,266 @@
+# models.py
+# class PointsActionType(Base):
+#     __tablename__ = "points_pointsactiontype"
+
+#     id = Column(Integer, primary_key=True, index=True)
+#     action_type = Column(String(32), nullable=False)
+#     default_points = Column(Integer, nullable=False)
+
+class BrandOption(Base):
+    __tablename__ = "coupon_brandoption"
+
+    id = Column(BigInteger, primary_key=True, index=True)
+    name = Column(String(100), nullable=False)
+    is_active = Column(Boolean, default=True)
+
+    coupons = relationship("Coupon", back_populates="brand")
+
+
+class CategoryOption(Base):
+    __tablename__ = "coupon_categoryoption"
+
+    id = Column(BigInteger, primary_key=True, index=True)
+    name = Column(String(100), nullable=False)
+    is_active = Column(Boolean, default=True)
+
+    coupons = relationship("Coupon", back_populates="category")
+
+
+class OffertypeOption(Base):
+    __tablename__ = "coupon_offertypeoption"
+
+    id = Column(BigInteger, primary_key=True, index=True)
+    name = Column(String(100), nullable=False)
+    is_active = Column(Boolean, default=True)
+
+    coupons = relationship("Coupon", back_populates="offer_type")
+
+
+class Coupon(Base):
+    __tablename__ = "coupon_coupon"
+
+    id = Column(BigInteger, primary_key=True, index=True)
+    title = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+    code = Column(String(100), unique=True, nullable=False)
+
+    category_id = Column(BigInteger, ForeignKey("coupon_categoryoption.id"), nullable=False)
+    brand_name_id = Column(BigInteger, ForeignKey("coupon_brandoption.id"), nullable=False)
+    offer_type_id = Column(BigInteger, ForeignKey("coupon_offertypeoption.id"), nullable=False)
+
+    country_id = Column(BigInteger, nullable=False)
+    state_id = Column(BigInteger, nullable=False)
+    city_id = Column(BigInteger, nullable=False)
+    pincode_id = Column(BigInteger, nullable=False)
+    age_group_id = Column(BigInteger, nullable=False)
+    gender_id = Column(BigInteger, nullable=False)
+    spending_power_id = Column(BigInteger, nullable=False)
+
+    max_redemptions = Column(Integer, nullable=False)
+    validity = Column(String(100), nullable=True)
+    image = Column(String(255), nullable=True)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    redeemed_count = Column(Integer, default=0)
+    displays_per_coupon = Column(Integer, default=0)
+    rate_per_display = Column(Float, default=0.0)
+
+    payment_method = Column(String(50), nullable=True)
+    final_paid_amount = Column(Float, default=0.0)
+    gst_amount = Column(Float, default=0.0)
+
+    advertiser_id = Column(BigInteger, nullable=False)
+
+    saved = Column(Boolean, default=False)
+    views = Column(Integer, default=0)
+
+    payment_details = Column(Text, nullable=True)
+    payment_status = Column(String(50), nullable=False, default="Pending")
+
+    # Relationships
+    category = relationship("CategoryOption", back_populates="coupons")
+    brand = relationship("BrandOption", back_populates="coupons")
+    offer_type = relationship("OffertypeOption", back_populates="coupons")
+    histories = relationship("CouponHistory", back_populates="coupon", primaryjoin="Coupon.code==CouponHistory.coupon_id")
+
+class CouponHistory(Base):
+    __tablename__ = "points_couponclaimed"
+
+    id = Column(Integer, primary_key=True, index=True)
+    date_claimed = Column(DateTime, default=datetime.utcnow)
+    expiry_date = Column(DateTime, nullable=False)
+    coupon_id = Column(String, ForeignKey("coupon_coupon.code"), nullable=False)
+    user_id = Column(Integer, ForeignKey("UserProfile.id"))
+
+    # Relationship
+    user = relationship("UserProfile")
+    coupon = relationship("Coupon", back_populates="histories", primaryjoin="CouponHistory.coupon_id==Coupon.code")
+
+
+class PatientProfile(Base):
+    __tablename__ = "patient_profile"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("UserProfile.id"))
+    first_name = Column(String, nullable=False)
+    last_name = Column(String, nullable=False)
+    gender = Column(String, nullable=False)
+    age = Column(Integer, nullable=False)
+    relation = Column(String, nullable=False)
+
+    # Relationship to UserProfile (many patients belong to one user)
+    user = relationship("UserProfile")
+
+    
+class WishlistMedicine(Base):
+    __tablename__ = "wishlist_medicines"
+
+    id = Column(Integer, primary_key=True, index=True)
+    
+    # FK -> UserProfile table
+    user_id = Column(Integer, ForeignKey("UserProfile.id", ondelete="CASCADE"), nullable=False)
+
+    # store MongoDB medicine ObjectId (string form)
+    medicine_mongo_id = Column(String(50), nullable=False)
+
+    quantity = Column(Integer, default=1)
+    is_favorite = Column(Boolean, default=False)
+    created_at = Column(TIMESTAMP, server_default=func.now())
+
+    __table_args__ = (UniqueConstraint("user_id", "medicine_mongo_id", name="_user_medicine_uc"),)
+
+    # Relationship back to UserProfile
+    user = relationship("UserProfile")
+
+
+# bidding model for doctor appointments using Django ORM
+class DoctorAppointment(Base):
+    __tablename__ = "doctor_appointments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    doctor_id = Column(String(50), nullable=False)
+    name = Column(String(100), nullable=False)
+    specialization = Column(String(100))
+    experience_years = Column(Integer)
+    gender = Column(String(20))
+    rating = Column(DECIMAL(2,1))
+
+    order_id = Column(String(50), unique=True, nullable=False)
+    appointment_date = Column(Date, nullable=False)
+    appointment_start_time = Column(Time, nullable=False)
+    appointment_end_time = Column(Time, nullable=False)
+    created_at = Column(TIMESTAMP, server_default=func.now())
+
+    location = Column(String(255))
+    distance_km = Column(DECIMAL(5,2))
+    travel_time_mins = Column(Integer)
+
+    clinic_fee = Column(DECIMAL(10,2))
+    home_fee = Column(DECIMAL(10,2))
+
+    status = Column(String(20), default="Pending")
+
+# cart model for medicines using Django ORM
+
+class CartItem(Base):
+    __tablename__ = "cart_items"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    # Foreign keys
+    user_id = Column(Integer, ForeignKey("UserProfile.id", ondelete="CASCADE"), nullable=False)
+    medicine_id = Column(Integer, nullable=False)  # If medicines are in MongoDB, store their ID (string/int)
+
+    quantity = Column(Integer, nullable=False, default=1)
+
+    # Prices
+    price = Column(DECIMAL(10, 2), nullable=False)  # discounted price
+    original_price = Column(DECIMAL(10, 2), nullable=True)  # before discount
+
+    # Prescription status
+    prescription_status = Column(
+        String(20),
+        nullable=False,
+        server_default="Pending"
+    )  # 'Received', 'Pending', 'Required'
+
+    is_generic = Column(Boolean, default=False)
+
+    # Timestamps
+    created_at = Column(TIMESTAMP, server_default=func.now(), nullable=False)
+    updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    # Relationships
+    user = relationship("UserProfile", backref="cart_items")
+
+
+line 170:
+
+class PointsBadge(Base):
+    __tablename__ = "points_pointsbadge"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False, unique=True)
+    min_points = Column(Integer, nullable=True) 
+    max_points = Column(Integer, nullable=True)  
+    description = Column(String, nullable=True)
+    image_url = Column(String, nullable=True) 
+
+class PointsActionType(Base):
+    __tablename__ = "points_pointsactiontype"   # ✅ match DB
+
+    id = Column(Integer, primary_key=True, index=True)
+    action_type = Column(String, nullable=False)
+    default_points = Column(Integer, nullable=False)
+
+    # Relationship
+    reward_histories = relationship("RewardHistory", back_populates="action_type")
+
+class RewardHistory(Base):
+    __tablename__ = "points_pointshistory"
+    id = Column(Integer, primary_key=True, index=True)
+    points = Column(Integer, nullable=False)
+    timestamp = Column(DateTime, default=datetime.utcnow)
+    action_type_id = Column(Integer, ForeignKey("points_pointsactiontype.id"))
+    user_id = Column(Integer, ForeignKey("UserProfile.id"))
+
+    # Relationship
+    action_type = relationship("PointsActionType", back_populates="reward_histories")
+    user = relationship("UserProfile")
+
+
+# ---------------------------
+# CartItem Schemas
+# ---------------------------
+
+class CartItemBase(BaseModel):
+    user_id: int
+    medicine_id: int  # If you use MongoDB ObjectId, change to str
+    quantity: Optional[conint(gt=0)] = 1
+    price: condecimal(max_digits=10, decimal_places=2)
+    original_price: Optional[condecimal(max_digits=10, decimal_places=2)] = None
+    prescription_status: Optional[str] = "Pending"  
+    is_generic: Optional[bool] = False
+
+
+class CartItemCreate(CartItemBase):
+    """Schema for creating a new cart item"""
+    pass
+
+
+class CartItemUpdate(BaseModel):
+    """Schema for updating a cart item (quantity, prescription status, etc.)"""
+    quantity: Optional[conint(gt=0)]
+    prescription_status: Optional[str]
+    is_generic: Optional[bool]
+
+
+class CartItemResponse(CartItemBase):
+    """Schema for returning a cart item in responses"""
+    id: int
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        orm_mode = True

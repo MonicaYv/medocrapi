@@ -12,6 +12,10 @@ ALGORITHM = os.getenv("ALGORITHM")
 # Database settings
 DATABASE_URL = os.getenv("DATABASE_URL")
 
+# Mongo DB
+MONGO_DATABASE_HOST = os.getenv("MONGO_DATABASE_HOST")
+MONGO_DATABASE_NAME = os.getenv("MONGO_DATABASE_NAME")
+
 # Email settings
 EMAIL_ENABLED = os.getenv("EMAIL_ENABLED", "false").lower() == "true"
 

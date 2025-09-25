@@ -4,8 +4,8 @@ from sqlalchemy.future import select
 from sqlalchemy import and_, update, delete
 from typing import List, Optional
 from app.database import get_db
-from app.models import DoctorProfile, UserProfile, HealthIssues
-from app.schemas import DoctorProfileCreate, DoctorProfileOut, DoctorProfileUpdate, HealthIssueOut
+from app.models import DoctorProfile, UserProfile, HealthIssues, DoctorAppointment
+from app.schemas import DoctorProfileCreate, DoctorProfileOut, DoctorProfileUpdate, HealthIssueOut, DoctorAppointmentOut
 from app.config import AUTHORIZATION_KEY
 from app.routers.user_auth import get_current_user_object
 
@@ -234,3 +234,72 @@ async def get_health_issues(
     except Exception as e:
         print(f"Error getting health issues: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to get health issues: {str(e)}")
+    
+# appoinments
+
+@router.get("/appointment_list", response_model=List[DoctorAppointmentOut])
+async def get_all_appointments(
+    doctor_id: Optional[int] = Query(None, description="Filter by doctor ID"),
+    user_id: Optional[int] = Query(None, description="Filter by user ID"),
+    limit: Optional[int] = Query(50, description="Number of records to return"),
+    offset: Optional[int] = Query(0, description="Number of records to skip"),
+    db: AsyncSession = Depends(get_db),
+    current_user: UserProfile = Depends(get_current_user_object),
+    _auth=Depends(check_authorization_key)
+):
+    """Get all appointments with optional filters and pagination"""
+    try:
+        query = select(DoctorAppointment)
+        filters = []
+        if doctor_id:
+            filters.append(DoctorAppointment.doctor_id == doctor_id)
+        if user_id:
+            filters.append(DoctorAppointment.user_id == user_id)
+        if filters:
+            query = query.where(and_(*filters))
+        query = query.order_by(DoctorAppointment.id.desc()).offset(offset).limit(limit)
+        result = await db.execute(query)
+        appointments = result.scalars().all()
+        return appointments
+    except Exception as e:
+        print(f"Error getting appointments: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get appointments: {str(e)}")
+
+# ✅ Get appointment by ID
+
+@router.get("/{appointment_id}", response_model=DoctorAppointmentOut)
+async def get_appointment(
+    appointment_id: int,
+    db: AsyncSession = Depends(get_db),
+    _auth=Depends(check_authorization_key)
+):
+    """Get appointment by ID"""
+    try:
+        result = await db.execute(select(DoctorAppointment).where(DoctorAppointment.id == appointment_id))
+        appointment = result.scalars().first()
+        if not appointment:
+            raise HTTPException(status_code=404, detail="Appointment not found")
+        return appointment
+    except Exception as e:
+        print(f"Error getting appointment: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get appointment: {str(e)}")
+
+
+# ✅ Get appointments by Doctor ID
+@router.get("/doctor/{doctor_id}", response_model=List[DoctorAppointmentOut])
+async def get_appointments_by_doctor(
+    doctor_id: str,  # <-- change to str
+    db: AsyncSession = Depends(get_db),
+    _auth=Depends(check_authorization_key)
+):
+    try:
+        result = await db.execute(
+            select(DoctorAppointment).where(DoctorAppointment.doctor_id == doctor_id)
+        )
+        appointments = result.scalars().all()
+        if not appointments:
+            raise HTTPException(status_code=404, detail="No appointments found for this doctor")
+        return appointments
+    except Exception as e:
+        print(f"Error getting appointments by doctor: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get appointments by doctor: {str(e)}")

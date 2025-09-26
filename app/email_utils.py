@@ -21,7 +21,7 @@ async def send_email(recipient: str, subject: str, body: str):
     msg["Subject"] = subject
     msg.set_content(body)
     
-    print(f"🔗 Connecting to {SMTP_HOST}:{SMTP_PORT} with SSL")
+    print(f"🔗 Connecting to {SMTP_HOST}:{SMTP_PORT} with STARTTLS")
     try:
         await aiosmtplib.send(
             msg,
@@ -29,7 +29,8 @@ async def send_email(recipient: str, subject: str, body: str):
             port=SMTP_PORT,
             username=SMTP_USERNAME,
             password=SMTP_PASSWORD,
-            use_tls=EMAIL_USE_TLS,
+            use_tls=False,
+            start_tls=True,
         )
         print("✅ Email sent successfully!")
     except Exception as e:

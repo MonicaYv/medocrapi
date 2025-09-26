@@ -14,7 +14,6 @@ from app.schemas import (
 from app.config import AUTHORIZATION_KEY, SECRET_KEY, ALGORITHM
 from fastapi.security import OAuth2PasswordBearer
 import jwt
-from jwt.exceptions import PyJWTError as JWTError
 from app.routers.user_auth import get_current_user_object
 from app.email_utils import send_email
 
@@ -38,7 +37,7 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
         email: str = payload.get("sub")
         if email is None:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
-    except JWTError:
+    except jwt.InvalidTokenError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
     return email
 

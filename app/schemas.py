@@ -1,7 +1,6 @@
-from pydantic import BaseModel, EmailStr, conint, condecimal
-
+from pydantic import BaseModel, EmailStr
 from typing import Optional
-from datetime import datetime, date, time
+from datetime import datetime, date
 from typing import Optional, List
 
 class Token(BaseModel):
@@ -31,35 +30,46 @@ class RegisterFinal(BaseModel):
 
 class UserProfileOut(BaseModel):
     id: int
+    user_id: Optional[int] = None
     first_name: str
-    last_name: str
-    email: EmailStr
+    last_name: Optional[str] = None
+    age: Optional[int] = None
+    dob: Optional[date] = None
+    gender: Optional[str] = None
+    pan_number: Optional[str] = None
+    profile_photo_path: Optional[str] = None
+    referral_code: Optional[str] = None
+    otp: Optional[str] = None
+    email: Optional[EmailStr] = None
     
     class Config:
-        from_attributes = True 
+        from_attributes = True
 
 class UserProfileDetailOut(BaseModel):
     id: int
+    user_id: Optional[int] = None
     first_name: str
-    last_name: str
-    email: EmailStr
-    phone_number: str
+    last_name: Optional[str] = None
+    age: Optional[int] = None
     dob: Optional[date] = None
     gender: Optional[str] = None
-    pan_card: Optional[str] = None
-    profile_photo: Optional[str] = None
-    address: Optional[str] = None
-    city: Optional[str] = None
-    state: Optional[str] = None
-    pincode: Optional[str] = None
-    country: Optional[str] = None
-    age: Optional[int] = None
+    pan_number: Optional[str] = None
+    profile_photo_path: Optional[str] = None
+    referral_code: Optional[str] = None
+    otp: Optional[str] = None
+    email: Optional[EmailStr] = None
+    phone_number: Optional[str] = None
     inapp_notifications: Optional[bool] = None
     email_notifications: Optional[bool] = None
     push_notifications: Optional[bool] = None
     regulatory_alerts: Optional[bool] = None
     promotions_and_offers: Optional[bool] = None
     quite_mode: Optional[bool] = None
+    quite_mode_start_time: Optional[str] = None
+    quite_mode_end_time: Optional[str] = None
+    is_active: Optional[bool] = None
+    last_login: Optional[datetime] = None
+    last_login_ip: Optional[str] = None
     
     class Config:
         from_attributes = True
@@ -67,34 +77,40 @@ class UserProfileDetailOut(BaseModel):
 class UpdateProfileRequest(BaseModel):
     first_name: Optional[str] = None
     last_name: Optional[str] = None
+    age: Optional[int] = None
     dob: Optional[date] = None
     gender: Optional[str] = None
-    pan_card: Optional[str] = None
-    address: Optional[str] = None
-    city: Optional[str] = None
-    state: Optional[str] = None
-    pincode: Optional[str] = None
-    country: Optional[str] = None
-    age: Optional[int] = None
+    pan_number: Optional[str] = None
+    profile_photo_path: Optional[str] = None
+    referral_code: Optional[str] = None
+    otp: Optional[str] = None
+    email: Optional[EmailStr] = None
+    phone_number: Optional[str] = None
     inapp_notifications: Optional[bool] = None
     email_notifications: Optional[bool] = None
     push_notifications: Optional[bool] = None
+    regulatory_alerts: Optional[bool] = None
     promotions_and_offers: Optional[bool] = None
     quite_mode: Optional[bool] = None
+    quite_mode_start_time: Optional[str] = None
+    quite_mode_end_time: Optional[str] = None
+    is_active: Optional[bool] = None
+    last_login: Optional[datetime] = None
+    last_login_ip: Optional[str] = None
 
 # Alias for backward compatibility
 UserProfileUpdate = UpdateProfileRequest
 
 class UserAddress(BaseModel):
-    address_type: str
+    address_type: Optional[str] = None
     first_name: str
-    last_name: str
-    phone_number: str
-    country: str
-    city: str
-    area: str
-    zip_code: str
-    address: str
+    last_name: Optional[str] = None
+    phone_number: Optional[str] = None
+    country: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
+    pincode: Optional[str] = None
+    address: Optional[str] = None
 
 class AddressCreate(UserAddress):
     pass
@@ -102,7 +118,37 @@ class AddressCreate(UserAddress):
 class AddressOut(UserAddress):
     id: int
 
-    class Config:   
+    class Config:
+        from_attributes = True
+
+# User schemas
+class UserBase(BaseModel):
+    email: EmailStr
+    phone_country_code: Optional[str] = None
+    phone_number: Optional[str] = None
+    user_type: str
+    inapp_notifications: Optional[bool] = True
+    email_notifications: Optional[bool] = True
+    push_notifications: Optional[bool] = True
+    regulatory_alerts: Optional[bool] = True
+    promotions_and_offers: Optional[bool] = True
+    quite_mode: Optional[bool] = False
+    quite_mode_start_time: Optional[str] = None
+    quite_mode_end_time: Optional[str] = None
+    is_active: Optional[bool] = True
+
+class UserCreate(UserBase):
+    password: str
+
+class UserOut(UserBase):
+    id: int
+    created_at: datetime
+    updated_at: datetime
+    last_login: Optional[datetime] = None
+    last_login_ip: Optional[str] = None
+    profile: Optional[UserProfileOut] = None
+
+    class Config:
         from_attributes = True
 
 
@@ -115,8 +161,7 @@ class IssueTypeOut(IssueTypeBase):
     id: int
 
     class Config:
-        from_attributes = True
-        # orm_mode = True
+        orm_mode = True
 
 # --- For GET /api/issue_option?issue_type_id=1 ---
 class IssueOptionBase(BaseModel):
@@ -127,8 +172,7 @@ class IssueOptionOut(IssueOptionBase):
     id: int
 
     class Config:
-        # orm_mode = True
-        from_attributes = True
+        orm_mode = True
 
 class SupportTicketBase(BaseModel):
     description: str
@@ -148,8 +192,7 @@ class SupportTicketOut(SupportTicketBase):
     updated_at: datetime
 
     class Config:
-        # orm_mode = True
-        from_attributes = True
+        orm_mode = True
 
 
 class ChatSupportCreate(BaseModel):
@@ -170,8 +213,7 @@ class ChatSupportOut(ChatSupportCreate):
     is_read: bool
 
     class Config:
-        # orm_mode = True
-        from_attributes = True
+        orm_mode = True
 
 class FAQBase(BaseModel):
     question: str
@@ -186,8 +228,7 @@ class FAQOut(FAQBase):
     updated_at: datetime
 
     class Config:
-        # orm_mode = True
-        from_attributes = True
+        orm_mode = True
 
 class FAQSearch(BaseModel):
     keyword: Optional[str] = None
@@ -412,12 +453,13 @@ class DonationHistoryFilter(BaseModel):
 
 # Donation Bill Schema
 class DonationBillOut(BaseModel):
+    # Receipt Details
     receipt_no: str
     date: str
     ngo_name: str
-    ngo_pan: str = "AABC14567D"
-    ngo_80g_reg_no: str = "80G/98765/2023-24"
-    ngo_address: str = "45-A, Lajpat Nagar, New Delhi - 110024"
+    ngo_pan: str = "AABC14567D"  # Static for now
+    ngo_80g_reg_no: str = "80G/98765/2023-24"  # Static for now
+    ngo_address: str = "45-A, Lajpat Nagar, New Delhi - 110024"  # Static for now
     
     # Donor Details
     donor_name: str
@@ -437,177 +479,8 @@ class DonationBillOut(BaseModel):
     # Acknowledgment
     receipt_acknowledgment: str = "This receipt acknowledges that we have received the above-mentioned donation voluntarily. Thank you for your support."
     authorized_signatory: str = "Authorized Signatory"
-    organization_name: str = "Jeevan Prakash Foundation"
+    organization_name: str = "Jeevan Prakash Foundation"  # Static for now
 
     class Config:
         from_attributes = True
     
-
-class BrandOptionOut(BaseModel):
-    id: int
-    name: str
-    is_active: bool
-
-    class Config:
-        orm_mode = True
-
-
-class CategoryOptionOut(BaseModel):
-    id: int
-    name: str
-    is_active: bool
-
-    class Config:
-        orm_mode = True
-
-
-
-class OffertypeOptionOut(BaseModel):
-    id: int
-    name: str
-    is_active: bool
-
-    class Config:
-        orm_mode = True
-
-
-class CouponBase(BaseModel):
-    id: int
-    title: str
-    description: str
-    code: str
-    category_id: int
-    brand_name_id: int
-    offer_type_id: int
-    max_redemptions: int
-    validity:date
-    image: Optional[str] = None
-    redeemed_count: int
-    displays_per_coupon: int
-    rate_per_display: float
-
-    class Config:
-        orm_mode = True
-
-
-
-class RedeemCouponRequest(BaseModel):
-    coupon_id: str
-    expiry_date: date
-    user_id: int
-
-
-
-class CouponHistoryResponse(BaseModel):
-    id: int
-    coupon_id: int
-    user_id: int
-    date_claimed: datetime
-    expiry_date: date
-
-    class Config:
-        orm_mode = True
-
-
-class UserProfileUpdate(BaseModel):
-    first_name: Optional[str] = None
-    last_name: Optional[str] = None
-    dob: Optional[date] = None
-    gender: Optional[str] = None
-    pan_card: Optional[str] = None
-    address: Optional[str] = None
-    city: Optional[str] = None
-    state: Optional[str] = None
-    pincode: Optional[str] = None
-    country: Optional[str] = None
-    age: Optional[int] = None
-    inapp_notifications: Optional[bool] = None
-    email_notifications: Optional[bool] = None
-    push_notifications: Optional[bool] = None
-    regulatory_alerts: Optional[bool] = None
-    promotions_and_offers: Optional[bool] = None
-    quite_mode: Optional[bool] = None
-
-# patient profile schemas
-
-
-# Create Patient (input)
-
-
-class PatientProfileBase(BaseModel):
-    first_name: str
-    last_name: str
-    gender: str
-    age: int
-    relation: str
-
-
-# ---------- Create ----------
-class PatientProfileCreate(PatientProfileBase):
-    pass   # All fields come from base, user_id will be added from current user
-
-
-# ---------- Update ----------
-class PatientProfileUpdate(BaseModel):
-    first_name: Optional[str] = None
-    last_name: Optional[str] = None
-    gender: Optional[str] = None
-    age: Optional[int] = None
-    relation: Optional[str] = None
-
-
-# ---------- Response ----------
-class PatientProfileResponse(PatientProfileBase):
-    id: int
-    user_id: int
-
-    class Config:
-        orm_mode = True
-
-
-# medicine
-class WishlistMedicineCreate(BaseModel):
-    medicine_mongo_id: str
-    quantity: Optional[int] = 1
-    is_favorite: Optional[bool] = False
-
-
-class WishlistMedicineOut(BaseModel):
-    id: int
-    user_id: int
-    medicine_mongo_id: str
-    quantity: int
-    is_favorite: bool
-    created_at: datetime
-    medicine_details: Optional[dict] = None  # from MongoDB
-
-    class Config:
-        orm_mode = True
-
-
-
-
-class DoctorAppointmentOut(BaseModel):
-    id: int
-    doctor_id: str
-    name: str
-    specialization: Optional[str]
-    experience_years: Optional[int]
-    gender: Optional[str]
-    rating: Optional[float]
-    order_id: str
-    appointment_date: date
-    appointment_start_time: time
-    appointment_end_time: time
-    created_at: Optional[datetime]
-    location: Optional[str]
-    distance_km: Optional[float]
-    travel_time_mins: Optional[int]
-    clinic_fee: Optional[float]
-    home_fee: Optional[float]
-    status: str
-
-    class Config:
-        orm_mode = True
-
-

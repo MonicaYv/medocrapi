@@ -10,3 +10,4 @@ alembic
 pydantic[email]
 aiosmtplib
 python-multipart
+motor

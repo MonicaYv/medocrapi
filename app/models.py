@@ -1,17 +1,8 @@
-from sqlalchemy import (
-    Column,
-    Integer,
-    String,
-    Boolean,
-    DateTime,
-    Date, Time,
-    Text,
-    ForeignKey
-)
-import datetime
+from sqlalchemy import (Column, Integer, String, Boolean, DateTime, Date, Time, Text, ForeignKey)
+from datetime import datetime
 from app.database import Base
 from sqlalchemy.orm import relationship, declarative_base
-
+from sqlalchemy import DECIMAL, TIMESTAMP, func
 Base = declarative_base()
 
 class User(Base):
@@ -55,11 +46,12 @@ class UserProfile(Base):
     user = relationship("User", back_populates="profile")
     addresses = relationship("UserAddress", back_populates="user_profile", cascade="all, delete")
 
+
 class UserAddress(Base):
     __tablename__ = "registration_useraddress"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_profile_id = Column(Integer, ForeignKey("user_profiles.id", ondelete="CASCADE"))
+    user_profile_id = Column(Integer, ForeignKey("registration_userprofile.id", ondelete="CASCADE"))
     address_type = Column(String(64), nullable=True)
     first_name = Column(String(255), nullable=False)
     last_name = Column(String(255), nullable=True)
@@ -148,7 +140,7 @@ class EmailSupport(Base):
     __tablename__ = "support_email"
     
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("UserProfile.id"))
+    user_id = Column(Integer, ForeignKey("registration_userprofile.id"))
     subject = Column(String, nullable=False)
     message = Column(String, nullable=False)
     email = Column(String, nullable=False)  # User's email
@@ -164,7 +156,7 @@ class PaymentMethod(Base):
     __tablename__ = "payment_methods"
     
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("UserProfile.id"))
+    user_id = Column(Integer, ForeignKey("registration_userprofile.id"))
     card_holder_name = Column(String, nullable=False)
     card_number_masked = Column(String, nullable=False)  # e.g., "**** **** **** 1234"
     card_type = Column(String, nullable=False)  # visa, mastercard, amex, etc.
@@ -194,7 +186,7 @@ class CouponHistory(Base):
     date_claimed = Column(DateTime, default=datetime.utcnow)
     expiry_date = Column(DateTime, nullable=False)
     coupon_id = Column(String, nullable=False)
-    user_id = Column(Integer, ForeignKey("UserProfile.id"))
+    user_id = Column(Integer, ForeignKey("registration_userprofile.id"))
 
     # Relationship
     user = relationship("UserProfile")
@@ -214,7 +206,7 @@ class RewardHistory(Base):
     points = Column(Integer, nullable=False)
     timestamp = Column(DateTime, default=datetime.utcnow)
     action_type_id = Column(Integer, ForeignKey("points_pointsactiontypes.id"))
-    user_id = Column(Integer, ForeignKey("UserProfile.id"))
+    user_id = Column(Integer, ForeignKey("registration_userprofile.id"))
 
     # Relationship
     action_type = relationship("PointsActionType", back_populates="points")
@@ -222,7 +214,7 @@ class RewardHistory(Base):
 class PatientProfile(Base):
     __tablename__ = "patient_profile"
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("UserProfile.id"))
+    user_id = Column(Integer, ForeignKey("registration_userprofile.id"))
     first_name = Column(String, nullable=False)
     last_name = Column(String, nullable=False)
     gender = Column(String, nullable=False)
@@ -235,7 +227,7 @@ class PatientProfile(Base):
 class DoctorProfile(Base):
     __tablename__ = "doctor_profile"
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("UserProfile.id"))
+    user_id = Column(Integer, ForeignKey("registration_userprofile.id"))
     first_name = Column(String, nullable=False)
     last_name = Column(String, nullable=False)
     gender = Column(String, nullable=False)
@@ -286,7 +278,7 @@ class DonationPost(Base):
     last_downloaded = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    user_id = Column(Integer, ForeignKey("UserProfile.id"))
+    user_id = Column(Integer, ForeignKey("registration_userprofile.id"))
 
     # Relationship
     user = relationship("UserProfile")
@@ -308,9 +300,31 @@ class Donation(Base):
     payment_status = Column(String, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     ngopost_id = Column(Integer, ForeignKey("ngopost_ngopost.id"))
-    user_id = Column(Integer, ForeignKey("UserProfile.id"))
+    user_id = Column(Integer, ForeignKey("registration_userprofile.id"))
     saved = Column(Boolean, default=False)
 
     # Relationship
     user = relationship("UserProfile")
     ngo_post = relationship("DonationPost")
+
+# class DoctorAppointment(Base):
+#     __tablename__ = "doctor_appointments"
+
+#     id = Column(Integer, primary_key=True, index=True)
+#     doctor_id = Column(String(50), nullable=False)
+#     name = Column(String(100), nullable=False)
+#     specialization = Column(String(100))
+#     experience_years = Column(Integer)
+#     gender = Column(String(20))
+#     rating = Column(DECIMAL(2,1))
+#     order_id = Column(String(50), unique=True, nullable=False)
+#     appointment_date = Column(Date, nullable=False)
+#     appointment_start_time = Column(Time, nullable=False)
+#     appointment_end_time = Column(Time, nullable=False)
+#     created_at = Column(TIMESTAMP, server_default=func.now())
+#     location = Column(String(255))
+#     distance_km = Column(DECIMAL(5,2))
+#     travel_time_mins = Column(Integer)
+#     clinic_fee = Column(DECIMAL(10,2))
+#     home_fee = Column(DECIMAL(10,2))
+#     status = Column(String(20), default="Pending")

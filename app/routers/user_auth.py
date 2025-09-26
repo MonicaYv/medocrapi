@@ -8,8 +8,8 @@ from fastapi.security import OAuth2PasswordBearer
 from datetime import datetime, timedelta
 from passlib.hash import pbkdf2_sha256
 import random, string
-from app.models import UserProfile, UserAddress
-from app.schemas import ContactInfo, RegisterFinal, VerifyLoginOTP, UserProfileOut, UserProfileDetailOut, UpdateProfileRequest, Token, AddressCreate, AddressOut
+from app.models import User, UserProfile, UserAddress
+from app.schemas import ContactInfo, RegisterFinal, VerifyLoginOTP, UserProfileOut, UserProfileDetailOut, UpdateProfileRequest, Token, AddressCreate, AddressOut, UserCreate, UserOut
 from app.otp_utils import generate_otp_secret, generate_otp, verify_otp
 from app.email_utils import send_email
 from app.database import get_db 
@@ -46,9 +46,9 @@ def check_authorization_key(authorization_key: str = Header(...)):
 @router.post("/request-otp", status_code=status.HTTP_200_OK)
 async def request_registration_otp(data: ContactInfo, db: AsyncSession = Depends(get_db), _auth=Depends(check_authorization_key)):
     if is_email(data.contact):
-        query = select(UserProfile).where(UserProfile.email == data.contact)
+        query = select(User).where(User.email == data.contact)
     else:
-        query = select(UserProfile).where(UserProfile.phone_number == data.contact)
+        query = select(User).where(User.phone_number == data.contact)
 
     existing_user = await db.execute(query)
     if existing_user.scalars().first():
@@ -69,37 +69,52 @@ async def register_user(data: RegisterFinal, db: AsyncSession = Depends(get_db),
     if not verify_otp(data.otp_token, data.otp):
         raise HTTPException(status_code=401, detail="Invalid or expired OTP.")
 
-    new_user = UserProfile(
+    # Create User
+    user = User(
+        email=data.email,
+        phone_country_code='+91',
+        phone_number=data.phone_number,
+        password=generate_random_string(),
+        user_type='user',
+        created_at=datetime.now(),
+        updated_at=datetime.now(),
+        is_active=True
+        # otp_secret=generate_otp_secret()
+    )
+    db.add(user)
+    await db.flush()  # get user.id
+
+    # Create UserProfile (no email/phone)
+    user_profile = UserProfile(
+        user_id=user.id,
         first_name=data.first_name,
         last_name=data.last_name,
-        user_type='user',
-        email=data.email,
-        phone_number=data.phone_number,
-        phone_country_code='+91',
-        password = generate_random_string(),
-        is_active=True,
         gender=data.gender,
         age=data.age
     )
-    db.add(new_user)
+    db.add(user_profile)
     await db.commit()
-    await db.refresh(new_user)
-    return new_user
+    await db.refresh(user_profile)
+    return user_profile
 
 @router.post("/login/request-otp", status_code=status.HTTP_200_OK)
 async def request_login_otp(data: ContactInfo, db: AsyncSession = Depends(get_db), _auth=Depends(check_authorization_key)):
     if is_email(data.contact):
-        query = select(UserProfile).where(UserProfile.email == data.contact)
+        query = select(User).where(User.email == data.contact)
     else:
-        query = select(UserProfile).where(UserProfile.phone_number == data.contact)
+        query = select(User).where(User.phone_number == data.contact)
 
     result = await db.execute(query)
     user = result.scalars().first()
 
-    if not user or not user.otp_secret:
+    # if not user or not user.otp_secret:
+    #     raise HTTPException(status_code=404, detail="User not found or not set up for OTP login.")
+    if not user:
         raise HTTPException(status_code=404, detail="User not found or not set up for OTP login.")
 
-    otp = generate_otp(user.otp_secret)
+    # otp = generate_otp(user.otp_secret)
+    otp_secret = generate_otp_secret()
+    otp = generate_otp(otp_secret)
     if is_email(user.email):
         asyncio.create_task(send_email(user.email, "Your Login Code", f"Your code is: {otp}"))
     else:
@@ -111,14 +126,16 @@ async def request_login_otp(data: ContactInfo, db: AsyncSession = Depends(get_db
 @router.post("/login/verify", response_model=Token)
 async def verify_login_and_get_token(data: VerifyLoginOTP, db: AsyncSession = Depends(get_db), _auth=Depends(check_authorization_key)):
     if is_email(data.contact):
-        query = select(UserProfile).where(UserProfile.email == data.contact)
+        query = select(User).where(User.email == data.contact)
     else:
-        query = select(UserProfile).where(UserProfile.phone_number == data.contact)
+        query = select(User).where(User.phone_number == data.contact)
 
     result = await db.execute(query)
     user = result.scalars().first()
 
-    if not user or not user.otp_secret or not verify_otp(user.otp_secret, data.otp):
+    # if not user or not user.otp_secret or not verify_otp(user.otp_secret, data.otp):
+    #     raise HTTPException(status_code=401, detail="Invalid contact or OTP.")
+    if not user:
         raise HTTPException(status_code=401, detail="Invalid contact or OTP.")
 
     # Create a JWT token for the authenticated user
@@ -136,92 +153,92 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession = Dep
     return email
 
 async def get_current_user_object(current_user_email: str = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    query = select(UserProfile).where(UserProfile.email == current_user_email)
-    result = await db.execute(query)
-    user = result.scalars().first()
+    # Get User by email
+    user_query = select(User).where(User.email == current_user_email)
+    user_result = await db.execute(user_query)
+    user = user_result.scalars().first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    return user
+    # Get UserProfile by user_id
+    profile_query = select(UserProfile).where(UserProfile.user_id == user.id)
+    profile_result = await db.execute(profile_query)
+    profile = profile_result.scalars().first()
+    if not profile:
+        raise HTTPException(status_code=404, detail="User profile not found")
+    return profile
 
 
-@router.post("/add_address", response_model=AddressOut)
-async def add_address(address_data: AddressCreate, current_user: UserProfile = Depends(get_current_user_object), db: AsyncSession = Depends(get_db)):
-    new_address = UserAddress(
-        address_type=address_data.address_type,
-        first_name=address_data.first_name,
-        last_name=address_data.last_name,
-        phone_number=address_data.phone_number,
-        country=address_data.country,
-        city=address_data.city,
-        area=address_data.area,
-        zip_code=address_data.zip_code,
-        address=address_data.address,
-        user_id=current_user.id
-    )
-    
-    db.add(new_address)
-    await db.commit()
-    await db.refresh(new_address)
-    return new_address
+# @router.post("/add_address", response_model=AddressOut)
+# async def add_address(address_data: AddressCreate, current_user: UserProfile = Depends(get_current_user_object), db: AsyncSession = Depends(get_db)):
+#     new_address = UserAddress(
+#         address_type=address_data.address_type,
+#         first_name=address_data.first_name,
+#         last_name=address_data.last_name,
+#         phone_number=address_data.phone_number,
+#         country=address_data.country,
+#         city=address_data.city,
+#         state=getattr(address_data, 'state', None),
+#         pincode=getattr(address_data, 'pincode', None),
+#         address=address_data.address,
+#         user_profile_id=current_user.id
+#     )
+#     db.add(new_address)
+#     await db.commit()
+#     await db.refresh(new_address)
+#     return new_address
 
-@router.get("/address_list", response_model=list[AddressOut])
-async def get_address_list(current_user: UserProfile = Depends(get_current_user_object), db: AsyncSession = Depends(get_db)):
-    query = select(UserAddress).where(UserAddress.user_id == current_user.id)
-    result = await db.execute(query)
-    addresses = result.scalars().all()
-    return addresses
+# @router.get("/address_list", response_model=list[AddressOut])
+# async def get_address_list(current_user: UserProfile = Depends(get_current_user_object), db: AsyncSession = Depends(get_db)):
+#     query = select(UserAddress).where(UserAddress.user_profile_id == current_user.id)
+#     result = await db.execute(query)
+#     addresses = result.scalars().all()
+#     return addresses
 
-@router.put("/update_address/{address_id}", response_model=AddressOut)
-async def update_address(
-    address_id: int,
-    address_data: AddressCreate,
-    current_user: UserProfile = Depends(get_current_user_object),
-    db: AsyncSession = Depends(get_db)
-):
-    # Check if address exists and belongs to current user
-    query = select(UserAddress).where(
-        UserAddress.id == address_id,
-        UserAddress.user_id == current_user.id
-    )
-    result = await db.execute(query)
-    address = result.scalars().first()
-    
-    if not address:
-        raise HTTPException(status_code=404, detail="Address not found")
-    
-    # Update address fields
-    address.address_type = address_data.address_type
-    address.first_name = address_data.first_name
-    address.last_name = address_data.last_name
-    address.phone_number = address_data.phone_number
-    address.country = address_data.country
-    address.city = address_data.city
-    address.area = address_data.area
-    address.zip_code = address_data.zip_code
-    address.address = address_data.address
-    
-    await db.commit()
-    await db.refresh(address)
-    return address
+# @router.put("/update_address/{address_id}", response_model=AddressOut)
+# async def update_address(
+#     address_id: int,
+#     address_data: AddressCreate,
+#     current_user: UserProfile = Depends(get_current_user_object),
+#     db: AsyncSession = Depends(get_db)
+# ):
+#     # Check if address exists and belongs to current user
+#     query = select(UserAddress).where(
+#         UserAddress.id == address_id,
+#         UserAddress.user_profile_id == current_user.id
+#     )
+#     result = await db.execute(query)
+#     address = result.scalars().first()
+#     if not address:
+#         raise HTTPException(status_code=404, detail="Address not found")
+#     # Update address fields
+#     address.address_type = address_data.address_type
+#     address.first_name = address_data.first_name
+#     address.last_name = address_data.last_name
+#     address.phone_number = address_data.phone_number
+#     address.country = address_data.country
+#     address.city = address_data.city
+#     address.state = getattr(address_data, 'state', None)
+#     address.pincode = getattr(address_data, 'pincode', None)
+#     address.address = address_data.address
+#     await db.commit()
+#     await db.refresh(address)
+#     return address
 
-@router.delete("/delete_address/{address_id}")
-async def delete_address(
-    address_id: int,
-    current_user: UserProfile = Depends(get_current_user_object),
-    db: AsyncSession = Depends(get_db)
-):
-    # Check if address exists and belongs to current user
-    query = select(UserAddress).where(
-        UserAddress.id == address_id,
-        UserAddress.user_id == current_user.id
-    )
-    result = await db.execute(query)
-    address = result.scalars().first()
-    
-    if not address:
-        raise HTTPException(status_code=404, detail="Address not found")
-    
-    await db.delete(address)
-    await db.commit()
-    
-    return {"message": "Address deleted successfully"}
+# @router.delete("/delete_address/{address_id}")
+# async def delete_address(
+#     address_id: int,
+#     current_user: UserProfile = Depends(get_current_user_object),
+#     db: AsyncSession = Depends(get_db)
+# ):
+#     # Check if address exists and belongs to current user
+#     query = select(UserAddress).where(
+#         UserAddress.id == address_id,
+#         UserAddress.user_profile_id == current_user.id
+#     )
+#     result = await db.execute(query)
+#     address = result.scalars().first()
+#     if not address:
+#         raise HTTPException(status_code=404, detail="Address not found")
+#     await db.delete(address)
+#     await db.commit()
+#     return {"message": "Address deleted successfully"}

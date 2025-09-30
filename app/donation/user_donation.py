@@ -1,15 +1,14 @@
-from fastapi import APIRouter, Depends, HTTPException, Header, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
-from sqlalchemy import and_, update, delete
+from sqlalchemy import and_
 from typing import List, Optional
 from datetime import datetime
 from app.database import get_db
-from app.config import AUTHORIZATION_KEY
-from app.models import DonationTypes as DonationTypesModel, UserProfile, Donation, DonationPost
-from app.schemas import DonationTypes, DonationOut, DonationHistoryFilter, DonationBillOut
-from app.routers.user_auth import get_current_user_object
+from app.models import Donation, DonationTypes
+from app.schemas import DonationOut, DonationTypes, DonationBillOut
+from app.profile.user_auth import get_current_user_object, check_authorization_key
 
 
 router = APIRouter( 
@@ -17,21 +16,16 @@ router = APIRouter(
     tags=["donation"]
 )
 
-def check_authorization_key(authorization_key: str = Header(...)):
-    if authorization_key != AUTHORIZATION_KEY:
-        raise HTTPException(status_code=401, detail="Invalid authorization key")
-    return authorization_key
-
  # =========== Donation APIs ===========
 
 @router.get("/donation_types", response_model=List[DonationTypes])
 async def get_donation_types(
     db: AsyncSession = Depends(get_db), 
     _auth=Depends(check_authorization_key),
-    current_user: UserProfile = Depends(get_current_user_object)
+    current_user = Depends(get_current_user_object)
 ):
     try:
-        query = select(DonationTypesModel).where(DonationTypesModel.is_active == True)
+        query = select(DonationTypes).where(DonationTypes.is_active == True)
         result = await db.execute(query)
         donation_types = result.scalars().all()
         return donation_types
@@ -43,7 +37,7 @@ async def get_donation_types(
 async def get_donation_history(
     db: AsyncSession = Depends(get_db),
     _auth=Depends(check_authorization_key),
-    current_user: UserProfile = Depends(get_current_user_object),
+    current_user = Depends(get_current_user_object),
     payment_status: Optional[str] = Query(None, description="Filter by payment status"),
     payment_method: Optional[str] = Query(None, description="Filter by payment method"),
     start_date: Optional[datetime] = Query(None, description="Filter from start date"),
@@ -54,41 +48,31 @@ async def get_donation_history(
     offset: Optional[int] = Query(0, description="Number of records to skip")
 ):
     """Get donation history for the current user with optional filters"""
+    user, profile = current_user
     try:
-        # Base query for current user's donations
-        query = select(Donation).where(Donation.user_id == current_user.id)
+        query = select(Donation).where(Donation.user_id == user.id)
         
-        # Apply filters
         filters = []
         
         if payment_status:
             filters.append(Donation.payment_status.ilike(f"%{payment_status}%"))
-        
         if payment_method:
             filters.append(Donation.payment_method.ilike(f"%{payment_method}%"))
-        
         if start_date:
             filters.append(Donation.payment_date >= start_date)
-        
         if end_date:
             filters.append(Donation.payment_date <= end_date)
-        
         if min_amount is not None:
             filters.append(Donation.amount >= min_amount)
-        
         if max_amount is not None:
             filters.append(Donation.amount <= max_amount)
-        
         if filters:
             query = query.where(and_(*filters))
-        
-        # Apply ordering, limit, and offset
         query = query.order_by(Donation.payment_date.desc()).offset(offset).limit(limit)
         
         result = await db.execute(query)
         donations = result.scalars().all()
-         
-        print(f"Found {len(donations)} donation records for user {current_user.id}")
+        print(f"Found {len(donations)} donation records for user {user.id}")
         return donations
     
     except Exception as e:
@@ -101,7 +85,6 @@ def convert_amount_to_words(amount):
         if amount == 0:
             return "Zero Only"
         
-        # For simplicity, handling up to thousands
         units = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine"]
         teens = ["Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"]
         tens = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"]
@@ -120,7 +103,6 @@ def convert_amount_to_words(amount):
                 result += f" {convert_amount_to_words(remainder).replace(' Only', '')}"
             return f"{result} Only"
         else:
-            # For amounts >= 1000, return a simplified version
             return f"INR {amount} Only"
     except:
         return f"INR {amount} Only"
@@ -130,9 +112,10 @@ async def get_donation_bill(
     donation_id: int,
     db: AsyncSession = Depends(get_db),
     _auth=Depends(check_authorization_key),
-    current_user: UserProfile = Depends(get_current_user_object)
+    current_user = Depends(get_current_user_object)
 ):
     """Generate donation bill/receipt for a specific donation"""
+    user, profile = current_user
     try:
         # Get donation with user and ngo_post details
         query = select(Donation).options(
@@ -141,7 +124,7 @@ async def get_donation_bill(
         ).where(
             and_(
                 Donation.id == donation_id,
-                Donation.user_id == current_user.id
+                Donation.user_id == user.id
             )
         )
         
@@ -184,7 +167,7 @@ async def get_donation_bill(
             amount_in_words=amount_in_words
         )
         
-        print(f"Generated bill for donation {donation_id} for user {current_user.id}")
+        print(f"Generated bill for donation {donation_id} for user {user.id}")
         return bill_data
         
     except Exception as e:

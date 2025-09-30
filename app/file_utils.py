@@ -9,7 +9,7 @@ UPLOAD_DIR = Path("app/uploads/profile_photos")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 # Allowed file extensions
-ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
+ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png"}
 MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
 
 def is_valid_image(file: UploadFile) -> bool:
@@ -21,12 +21,11 @@ def is_valid_image(file: UploadFile) -> bool:
 
 def save_profile_photo(file: UploadFile, user_id: int) -> str:
     if not is_valid_image(file):
-        raise HTTPException(status_code=400, detail="Invalid file type. Only JPG, PNG, GIF, WEBP allowed.")
+        raise HTTPException(status_code=400, detail="Invalid file type. Only JPG, PNG allowed.")
     
-    # Check file size
-    file.file.seek(0, 2)  # Seek to end
+    file.file.seek(0, 2)
     file_size = file.file.tell()
-    file.file.seek(0)  # Reset to beginning
+    file.file.seek(0)
     
     if file_size > MAX_FILE_SIZE:
         raise HTTPException(status_code=400, detail="File size too large. Maximum 5MB allowed.")

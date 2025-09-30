@@ -1,51 +1,18 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, Header, status
+import asyncio
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from typing import List, Optional
-import time
-import asyncio
-from app.database import get_db, SessionLocal
-from app.models import IssueType, IssueOption, ChatSupport, FAQ, EmailSupport, UserProfile, SupportTicket
-from app.schemas import (
-    IssueTypeOut, IssueOptionOut, SupportTicketCreate, SupportTicketOut, 
-    ChatSupportCreate, ChatSupportOut, EmailSupportCreate, EmailSupportOut, 
-    EmailSupportUpdateStatus, FAQOut
-)
-from app.config import AUTHORIZATION_KEY, SECRET_KEY, ALGORITHM
-from fastapi.security import OAuth2PasswordBearer
-import jwt
-from jwt.exceptions import PyJWTError as JWTError
-from app.routers.user_auth import get_current_user_object
+from app.database import get_db
+from app.models import User, UserProfile, IssueType, IssueOption, SupportTicket, ChatSupport, EmailSupport, FAQ
+from app.schemas import IssueTypeOut, SupportTicketCreate, SupportTicketOut, IssueOptionOut, ChatSupportOut, ChatSupportCreate, EmailSupportOut, EmailSupportUpdateStatus, EmailSupportCreate, FAQOut
+from app.profile.user_auth import get_current_user_object, check_authorization_key, get_current_user
 from app.email_utils import send_email
-
-
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
-
 
 router = APIRouter(
     prefix="/auth",
     tags=["Authentication"]
 )
-def check_authorization_key(authorization_key: str = Header(...)):
-    if authorization_key != AUTHORIZATION_KEY:
-        raise HTTPException(status_code=401, detail="Invalid authorization key")
-    return authorization_key
-
-# JWT token validation dependency
-def get_current_user(token: str = Depends(oauth2_scheme)):
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        email: str = payload.get("sub")
-        if email is None:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
-    except JWTError:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
-    return email
-
-# Dependency for DB session
-async def get_db():
-    async with SessionLocal() as session:
-        yield session
 
 # ✅ GET /api/issue_type - Only id & name
 @router.get("/issue_type", response_model=List[IssueTypeOut])
@@ -58,7 +25,7 @@ async def get_issue_types(
     issue_types = result.scalars().all()
     return issue_types
 
-# ✅ GET /api/issue_option?issue_type_id=1 - Only options for a given issue_type
+# # ✅ GET /api/issue_option?issue_type_id=1 - Only options for a given issue_type
 @router.get("/issue_option", response_model=List[IssueOptionOut])
 async def get_issue_options(
     issue_type_id: int = Query(...),
@@ -74,8 +41,7 @@ async def get_issue_options(
         raise HTTPException(status_code=404, detail="No options found for given IssueType ID")
     return options
 
-#  Get/api/supportTicket
-
+#  GET /api/supportTicket
 @router.post("/create_support_ticket", response_model=SupportTicketOut)
 async def create_support_ticket(
     ticket: SupportTicketCreate,
@@ -89,6 +55,7 @@ async def create_support_ticket(
     await db.refresh(new_ticket)
     return new_ticket
 
+
 @router.get("/get_all_support_tickets", response_model=list[SupportTicketOut])
 async def get_all_support_tickets(
     search_text: str = Query(None, description="Search in ticket description"),
@@ -97,21 +64,12 @@ async def get_all_support_tickets(
     _auth=Depends(check_authorization_key)
 ):
     """Get all support tickets with optional search and filters"""
-    
-    # Base query for all support tickets
     query = select(SupportTicket)
-    
-    # Apply search filter if provided
     if search_text:
-        query = query.where(SupportTicket.description.ilike(f"%{search_text}%"))
-    
-    # Apply status filter if provided
+        query = query.where(SupportTicket.description.like(f"%{search_text}%"))
     if status:
         query = query.where(SupportTicket.status == status)
-    
-    # Order by most recent first
     query = query.order_by(SupportTicket.created_at.desc())
-    
     result = await db.execute(query)
     tickets = result.scalars().all()
     return tickets
@@ -160,17 +118,19 @@ async def send_message(
 @router.post("/create_email_support", response_model=EmailSupportOut)
 async def create_email_support(
     email_data: EmailSupportCreate,
-    current_user: UserProfile = Depends(get_current_user_object),
+    current_user = Depends(get_current_user_object),
     db: AsyncSession = Depends(get_db),
     _auth=Depends(check_authorization_key)
 ):  
+    user, profile = current_user
     try:
+        
         # Create new email support record
         new_email_support = EmailSupport(
-            user_id=current_user.id,
+            user_id=user.id,
             subject=email_data.subject,
             message=email_data.message,
-            email=current_user.email,
+            email=user.email,
             priority=email_data.priority,
             status="pending"
         )
@@ -178,10 +138,8 @@ async def create_email_support(
         db.add(new_email_support)
         await db.commit()
         await db.refresh(new_email_support)
-        
-        # Send confirmation email to user
         confirmation_message = f"""
-        Dear {current_user.first_name},
+        Dear {profile.first_name},
         
         Your email support request has been received successfully.
         
@@ -200,13 +158,12 @@ async def create_email_support(
         try:
             asyncio.create_task(
                 send_email(
-                    current_user.email,
+                    user.email,
                     f"Support Request Received - ES-{new_email_support.id}",
                     confirmation_message
                 )
             )
         except Exception as e:
-            # Log the error but don't fail the request
             print(f"Failed to send email: {e}")
         
         return new_email_support
@@ -222,32 +179,22 @@ async def get_user_email_support(
     search_text: str = Query(None, description="Search in subject and message"),
     status: str = Query(None, description="Filter by status (pending, replied, closed)"),
     priority: str = Query(None, description="Filter by priority (low, normal, high, urgent)"),
-    current_user: UserProfile = Depends(get_current_user_object),
+    current_user = Depends(get_current_user_object),
     db: AsyncSession = Depends(get_db),
     _auth=Depends(check_authorization_key)
 ):
-    """Get current user's email support history with optional search and filters"""
-    
-    # Base query for current user's email support
-    query = select(EmailSupport).where(EmailSupport.user_id == current_user.id)
-    
-    # Apply search filter if provided
+    user, profile = current_user
+    query = select(EmailSupport).where(EmailSupport.user_id == user.id)
     if search_text:
         search_condition = (
             EmailSupport.subject.ilike(f"%{search_text}%") |
             EmailSupport.message.ilike(f"%{search_text}%")
         )
         query = query.where(search_condition)
-    
-    # Apply status filter if provided
     if status:
         query = query.where(EmailSupport.status == status)
-        
-    # Apply priority filter if provided
     if priority:
         query = query.where(EmailSupport.priority == priority)
-    
-    # Order by most recent first
     query = query.order_by(EmailSupport.created_at.desc())
     
     result = await db.execute(query)
@@ -270,20 +217,20 @@ async def update_email_support_status(
     if not email_support:
         raise HTTPException(status_code=404, detail="Email support request not found")
     
-    # Update status
     email_support.status = status_data.status
     await db.commit()
     await db.refresh(email_support)
     
-    # Get user details for notification
-    user_query = select(UserProfile).where(UserProfile.id == email_support.user_id)
+    user_query = select(User).where(User.id == email_support.user_id)
     user_result = await db.execute(user_query)
     user = user_result.scalars().first()
     
+    profile_result = await db.execute(select(UserProfile).where(UserProfile.user_id == email_support.user_id))
+    profile = profile_result.scalars().first()
+    
     if user:
-        # Send status update email to user
         status_message = f"""
-        Dear {user.first_name},
+        Dear {profile.first_name},
         
         Your email support request has been updated.
         
@@ -300,8 +247,6 @@ async def update_email_support_status(
         Best regards,
         MedoCRM Support Team
         """
-        
-        # Send notification email
         try:
             asyncio.create_task(
                 send_email(
@@ -311,7 +256,6 @@ async def update_email_support_status(
                 )
             )
         except Exception as e:
-            # Log the error but don't fail the request
             print(f"Failed to send notification email: {e}")
     
     return email_support
@@ -326,21 +270,15 @@ async def get_faqs(
     db: AsyncSession = Depends(get_db)
 ):
     query = select(FAQ)
-
-    # Apply profile type filter (default is 'user')
     if profile_type:
         query = query.filter(FAQ.profile_type == profile_type)
-
-    # Apply keyword filter if provided
     if keyword:
         keyword = f"%{keyword.lower()}%"
         query = query.filter(
             (FAQ.question.ilike(keyword)) | (FAQ.answer.ilike(keyword))
         )
 
-    # Apply category filter if provided
     if category:
         query = query.filter(FAQ.category == category)
-
     result = await db.execute(query)
     return result.scalars().all()

@@ -328,7 +328,7 @@ from app.schemas import IssueTypeOut, IssueOptionOut, EmailSupportCreate, EmailS
 from app.config import AUTHORIZATION_KEY, SECRET_KEY, ALGORITHM
 from app.models import SupportTicket
 from app.schemas import SupportTicketCreate, SupportTicketOut
-from app.routers.user_auth import get_current_user_object
+from app.profile.user_auth import get_current_user_object
 from app.email_utils import send_email
 
 router = APIRouter(

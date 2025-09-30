@@ -5,8 +5,6 @@ from .config import MONGO_DATABASE_HOST, MONGO_DATABASE_NAME
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 
-# Load environment variables from .env file
-
 engine = create_async_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine, class_=AsyncSession)
 Base = declarative_base()
@@ -19,7 +17,6 @@ async def get_db():
 mongo_client = AsyncIOMotorClient(MONGO_DATABASE_HOST)
 mongo_db: AsyncIOMotorDatabase = mongo_client[MONGO_DATABASE_NAME]
 
-# Export collections (optional)
 master_medicine_collection = mongo_db["master_medicine"]
 wishlist_collection = mongo_db["wishlist"]
 

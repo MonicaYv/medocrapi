@@ -1,32 +1,19 @@
-from fastapi import APIRouter, Depends, HTTPException, Header, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 from sqlalchemy import and_, func
 from typing import List, Optional
 from datetime import datetime
-from pydantic import BaseModel
 from app.database import get_db
-from app.models import PointsBadge, CouponHistory, UserProfile, RewardHistory, PointsActionType
-from app.schemas import PointsBadgeOut, CouponHistoryOut, RewardHistoryOut, PointsActionTypeOut
-from app.config import AUTHORIZATION_KEY
-from app.routers.user_auth import get_current_user_object
-
-# Response model for reward history with total points
-class RewardHistoryResponse(BaseModel):
-    reward_history: List[RewardHistoryOut]
-    total_points: int
-    filtered_total_points: int  # Total points for the applied filters
+from app.models import UserProfile, PointsBadge, CouponHistory, RewardHistory, PointsActionType
+from app.schemas import PointsBadgeOut, CouponHistoryOut, RewardHistoryResponse, PointsActionTypeOut
+from app.profile.user_auth import get_current_user_object, check_authorization_key
 
 router = APIRouter(
     prefix="/points-rewards",
     tags=["Points & Rewards"]
 )
- 
-def check_authorization_key(authorization_key: str = Header(...)):
-    if authorization_key != AUTHORIZATION_KEY:
-        raise HTTPException(status_code=401, detail="Invalid authorization key")
-    return authorization_key
 
 # GET /points-rewards/badge-list - Get all available badges
 @router.get("/badge-list", response_model=List[PointsBadgeOut])
@@ -40,7 +27,6 @@ async def get_badge_list(
         result = await db.execute(query)
         badges = result.scalars().all()
         
-        # Debug: Print badge data to see what's in the database
         for badge in badges:
             print(f"Badge: {badge.name}, min_points: {badge.min_points}, max_points: {badge.max_points}")
         

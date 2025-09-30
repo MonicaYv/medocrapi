@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Header, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import and_, update, delete
@@ -6,37 +6,30 @@ from typing import List, Optional
 from app.database import get_db
 from app.models import DoctorProfile, UserProfile, HealthIssues, DoctorAppointment
 from app.schemas import DoctorProfileCreate, DoctorProfileOut, DoctorProfileUpdate, HealthIssueOut, DoctorAppointmentOut
-from app.config import AUTHORIZATION_KEY
-from app.routers.user_auth import get_current_user_object
+from app.profile.user_auth import get_current_user_object, check_authorization_key
 
 router = APIRouter(
     prefix="/doctors",
     tags=["Patient Doctors"]
 )
 
-def check_authorization_key(authorization_key: str = Header(...)):
-    if authorization_key != AUTHORIZATION_KEY:
-        raise HTTPException(status_code=401, detail="Invalid authorization key")
-    return authorization_key
-
-
-
 # ========== DOCTOR MANAGEMENT APIs ==========
 @router.post("/add_doctor", response_model=DoctorProfileOut)
 
 async def add_doctor(
     doctor_data: DoctorProfileCreate,
-    current_user: UserProfile = Depends(get_current_user_object),
+    current_user = Depends(get_current_user_object),
     db: AsyncSession = Depends(get_db),
     _auth=Depends(check_authorization_key)
 ):
     """Add a new doctor for the current user"""
+    user, profile = current_user
     try:
         # Check if doctor already exists for this user (by name and specialization)
         existing_doctor = await db.execute(
             select(DoctorProfile).where(
                 and_(
-                    DoctorProfile.user_id == current_user.id,
+                    DoctorProfile.user_id == user.id,
                     DoctorProfile.first_name == doctor_data.first_name,
                     DoctorProfile.last_name == doctor_data.last_name,
                     DoctorProfile.specialties == doctor_data.specialties
@@ -48,7 +41,7 @@ async def add_doctor(
 
         # Create new doctor profile
         new_doctor = DoctorProfile(
-            user_id=current_user.id,
+            user_id=user.id,
             first_name=doctor_data.first_name,
             last_name=doctor_data.last_name,
             gender=doctor_data.gender,
@@ -74,14 +67,15 @@ async def get_doctors(
     specialties: Optional[str] = Query(None, description="Filter by specialties"),
     limit: Optional[int] = Query(50, description="Number of records to return"),
     offset: Optional[int] = Query(0, description="Number of records to skip"),
-    current_user: UserProfile = Depends(get_current_user_object),
+    current_user = Depends(get_current_user_object),
     db: AsyncSession = Depends(get_db),
     _auth=Depends(check_authorization_key)
 ):
     """Get all doctors for the current user with optional filters"""
+    user, profile = current_user
     try:
         # Base query for current user's doctors
-        query = select(DoctorProfile).where(DoctorProfile.user_id == current_user.id)
+        query = select(DoctorProfile).where(DoctorProfile.user_id == user.id)
         
         # Apply filters
         filters = []
@@ -109,7 +103,7 @@ async def get_doctors(
         result = await db.execute(query)
         doctors = result.scalars().all()
         
-        print(f"Found {len(doctors)} doctors for user {current_user.id}")
+        print(f"Found {len(doctors)} doctors for user {user.id}")
         return doctors
 
     except Exception as e:
@@ -121,18 +115,19 @@ async def get_doctors(
 async def update_doctor(
     doctor_id: int,
     doctor_data: DoctorProfileUpdate,
-    current_user: UserProfile = Depends(get_current_user_object),
+    current_user = Depends(get_current_user_object),
     db: AsyncSession = Depends(get_db),
     _auth=Depends(check_authorization_key)
 ):
     """Update doctor information"""
+    user, profile = current_user
     try:
         # Check if doctor exists and belongs to current user
         doctor_query = await db.execute(
             select(DoctorProfile).where(
                 and_(
                     DoctorProfile.id == doctor_id,
-                    DoctorProfile.user_id == current_user.id
+                    DoctorProfile.user_id == user.id
                 )
             )
         )
@@ -162,18 +157,19 @@ async def update_doctor(
 @router.delete("/delete_doctor/{doctor_id}")
 async def delete_doctor(
     doctor_id: int,
-    current_user: UserProfile = Depends(get_current_user_object),
+    current_user = Depends(get_current_user_object),
     db: AsyncSession = Depends(get_db),
     _auth=Depends(check_authorization_key)
 ):
     """Delete a doctor"""
+    user, profile = current_user
     try:
         # Check if doctor exists and belongs to current user
         doctor_query = await db.execute(
             select(DoctorProfile).where(
                 and_(
                     DoctorProfile.id == doctor_id,
-                    DoctorProfile.user_id == current_user.id
+                    DoctorProfile.user_id == user.id
                 )
             )
         )
@@ -198,17 +194,18 @@ async def delete_doctor(
 @router.get("/get_doctor/{doctor_id}", response_model=DoctorProfileOut)
 async def get_doctor(
     doctor_id: int,
-    current_user: UserProfile = Depends(get_current_user_object),
+    current_user = Depends(get_current_user_object),
     db: AsyncSession = Depends(get_db),
     _auth=Depends(check_authorization_key)
 ):
     """Get single doctor details"""
+    user, profile = current_user
     try:
         doctor_query = await db.execute(
             select(DoctorProfile).where(
                 and_(
                     DoctorProfile.id == doctor_id,
-                    DoctorProfile.user_id == current_user.id
+                    DoctorProfile.user_id == user.id
                 )
             )
         )
@@ -244,7 +241,7 @@ async def get_all_appointments(
     limit: Optional[int] = Query(50, description="Number of records to return"),
     offset: Optional[int] = Query(0, description="Number of records to skip"),
     db: AsyncSession = Depends(get_db),
-    current_user: UserProfile = Depends(get_current_user_object),
+    current_user = Depends(get_current_user_object),
     _auth=Depends(check_authorization_key)
 ):
     """Get all appointments with optional filters and pagination"""

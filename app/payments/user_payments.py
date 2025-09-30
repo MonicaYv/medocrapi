@@ -1,39 +1,32 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, Header
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import update
-from typing import List, Optional
+from typing import List
 from datetime import datetime
 from app.database import get_db
-from app.models import UserProfile, PaymentMethod
+from app.models import PaymentMethod
 from app.schemas import PaymentMethodCreate, PaymentMethodOut, PaymentMethodUpdate
-from app.config import AUTHORIZATION_KEY
-from app.routers.user_auth import get_current_user_object
+from app.profile.user_auth import get_current_user_object, check_authorization_key
 
 router = APIRouter(
     prefix="/payments",
     tags=["Payment Methods"]
 )
 
-def check_authorization_key(authorization_key: str = Header(...)):
-    if authorization_key != AUTHORIZATION_KEY:
-        raise HTTPException(status_code=401, detail="Invalid authorization key")
-    return authorization_key
-
-# ========== PAYMENT METHODS APIs ========== 
-
 # Add a new payment method
 @router.post("/add_payment_method", response_model=PaymentMethodOut)
 async def add_payment_method(
     payment_data: PaymentMethodCreate,
-    current_user: UserProfile = Depends(get_current_user_object),
+    current_user = Depends(get_current_user_object),
     db: AsyncSession = Depends(get_db),
     _auth=Depends(check_authorization_key)
 ):
+    user, profile = current_user
     try:
         existing_card = await db.execute(
             select(PaymentMethod).where(
-                PaymentMethod.user_id == current_user.id,
+                PaymentMethod.user_id == user.id,
                 PaymentMethod.card_number_masked == payment_data.card_number_masked
             )
         )
@@ -41,7 +34,7 @@ async def add_payment_method(
             raise HTTPException(status_code=409, detail="This card is already added")
 
         new_payment_method = PaymentMethod(
-            user_id=current_user.id,
+            user_id=user.id,
             card_holder_name=payment_data.card_holder_name,
             card_number_masked=payment_data.card_number_masked,
             card_type=payment_data.card_type,
@@ -56,7 +49,7 @@ async def add_payment_method(
         if payment_data.is_default:
             await db.execute(
                 update(PaymentMethod).where(
-                    PaymentMethod.user_id == current_user.id
+                    PaymentMethod.user_id == user.id
                 ).values(is_default=False)
             )
 
@@ -72,12 +65,13 @@ async def add_payment_method(
 # Get all payment methods for the current user
 @router.get("/get_payment_methods", response_model=List[PaymentMethodOut])
 async def get_payment_methods(
-    current_user: UserProfile = Depends(get_current_user_object),
+    current_user = Depends(get_current_user_object),
     db: AsyncSession = Depends(get_db),
     _auth=Depends(check_authorization_key)
 ):
+    user, profile = current_user
     query = select(PaymentMethod).where(
-        PaymentMethod.user_id == current_user.id,
+        PaymentMethod.user_id == user.id,
         PaymentMethod.status == "active"
     ).order_by(PaymentMethod.is_default.desc(), PaymentMethod.created_at.desc())
     result = await db.execute(query)
@@ -89,14 +83,15 @@ async def get_payment_methods(
 async def update_payment_method(
     payment_method_id: int,
     payment_data: PaymentMethodUpdate,
-    current_user: UserProfile = Depends(get_current_user_object),
+    current_user = Depends(get_current_user_object),
     db: AsyncSession = Depends(get_db),
     _auth=Depends(check_authorization_key)
 ):
+    user, profile = current_user
     try:
         query = select(PaymentMethod).where(
             PaymentMethod.id == payment_method_id,
-            PaymentMethod.user_id == current_user.id,
+            PaymentMethod.user_id == user.id,
             PaymentMethod.status == "active"
         )
         result = await db.execute(query)
@@ -114,7 +109,7 @@ async def update_payment_method(
             if payment_data.is_default:
                 await db.execute(
                     update(PaymentMethod).where(
-                        PaymentMethod.user_id == current_user.id,
+                        PaymentMethod.user_id == user.id,
                         PaymentMethod.id != payment_method_id
                     ).values(is_default=False)
                 )
@@ -133,14 +128,15 @@ async def update_payment_method(
 @router.delete("/delete_payment_method/{payment_method_id}")
 async def delete_payment_method(
     payment_method_id: int,
-    current_user: UserProfile = Depends(get_current_user_object),
+    current_user = Depends(get_current_user_object),
     db: AsyncSession = Depends(get_db),
     _auth=Depends(check_authorization_key)
 ):
+    user, profile = current_user
     try:
         query = select(PaymentMethod).where(
             PaymentMethod.id == payment_method_id,
-            PaymentMethod.user_id == current_user.id,
+            PaymentMethod.user_id == user.id,
             PaymentMethod.status == "active"
         )
         result = await db.execute(query)
@@ -161,14 +157,15 @@ async def delete_payment_method(
 @router.put("/set_default_payment_method/{payment_method_id}")
 async def set_default_payment_method(
     payment_method_id: int,
-    current_user: UserProfile = Depends(get_current_user_object),
+    current_user = Depends(get_current_user_object),
     db: AsyncSession = Depends(get_db),
     _auth=Depends(check_authorization_key)
 ):
+    user, profile = current_user
     try:
         query = select(PaymentMethod).where(
             PaymentMethod.id == payment_method_id,
-            PaymentMethod.user_id == current_user.id,
+            PaymentMethod.user_id == user.id,
             PaymentMethod.status == "active"
         )
         result = await db.execute(query)

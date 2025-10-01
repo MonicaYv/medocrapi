@@ -7,7 +7,7 @@ from typing import List, Optional
 from datetime import datetime
 from app.database import get_db
 from app.models import Donation, DonationTypes
-from app.schemas import DonationOut, DonationTypes, DonationBillOut
+from app.schemas import DonationOut, DonationType, DonationBillOut
 from app.profile.user_auth import get_current_user_object, check_authorization_key
 
 
@@ -18,7 +18,7 @@ router = APIRouter(
 
  # =========== Donation APIs ===========
 
-@router.get("/donation_types", response_model=List[DonationTypes])
+@router.get("/donation_types", response_model=List[DonationType])
 async def get_donation_types(
     db: AsyncSession = Depends(get_db), 
     _auth=Depends(check_authorization_key),
@@ -114,13 +114,11 @@ async def get_donation_bill(
     _auth=Depends(check_authorization_key),
     current_user = Depends(get_current_user_object)
 ):
-    """Generate donation bill/receipt for a specific donation"""
     user, profile = current_user
     try:
-        # Get donation with user and ngo_post details
         query = select(Donation).options(
             selectinload(Donation.user),
-            selectinload(Donation.ngo_post)
+            selectinload(Donation.ngopost)
         ).where(
             and_(
                 Donation.id == donation_id,
@@ -134,26 +132,18 @@ async def get_donation_bill(
         if not donation:
             raise HTTPException(status_code=404, detail="Donation not found or not authorized")
         
-        # Generate receipt number using order_id and date
         receipt_no = f"NGO/{donation.payment_date.year}/{donation.order_id:04d}"
-        
-        # Format date
         formatted_date = donation.payment_date.strftime("%d-%b-%Y")
-        
-        # Get donor details
         donor_name = f"{donation.user.first_name} {donation.user.last_name}"
         donor_email = donation.user.email
-        donor_pan = donation.user.pan_card if donation.user.pan_card else None
+        donor_pan = getattr(donation.user, "pan_card", None)
         
-        # Get NGO details (use ngo_post header as NGO name, fallback to static)
-        ngo_name = donation.ngo_post.header if donation.ngo_post else "Jeevan Prakash Foundation"
-        purpose_of_donation = donation.ngo_post.description if donation.ngo_post else "Medical Aid for Child in Need"
+        ngo_name = donation.ngopost.header if donation.ngopost else "Jeevan Prakash Foundation"
+        purpose_of_donation = donation.ngopost.description if donation.ngopost else "Medical Aid for Child in Need"
         
-        # Convert amount to words
         amount_in_words = convert_amount_to_words(donation.amount)
         
-        # Create bill response
-        bill_data = DonationBillOut(
+        return DonationBillOut(
             receipt_no=receipt_no,
             date=formatted_date,
             ngo_name=ngo_name,
@@ -166,10 +156,9 @@ async def get_donation_bill(
             purpose_of_donation=purpose_of_donation,
             amount_in_words=amount_in_words
         )
-        
-        print(f"Generated bill for donation {donation_id} for user {user.id}")
-        return bill_data
-        
+    
+    except HTTPException:  # ✅ let 404 or other HTTP errors pass through
+        raise
     except Exception as e:
         print(f"Error generating donation bill: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to generate donation bill: {str(e)}")

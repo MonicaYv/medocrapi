@@ -4,7 +4,7 @@ from sqlalchemy.future import select
 from sqlalchemy import and_, update, delete
 from typing import List, Optional
 from app.database import get_db
-from app.models import DoctorProfile, UserProfile, HealthIssues, DoctorAppointment
+from app.models import DoctorProfile, HealthIssues, DoctorAppointment
 from app.schemas import DoctorProfileCreate, DoctorProfileOut, DoctorProfileUpdate, HealthIssueOut, DoctorAppointmentOut
 from app.profile.user_auth import get_current_user_object, check_authorization_key
 
@@ -15,7 +15,6 @@ router = APIRouter(
 
 # ========== DOCTOR MANAGEMENT APIs ==========
 @router.post("/add_doctor", response_model=DoctorProfileOut)
-
 async def add_doctor(
     doctor_data: DoctorProfileCreate,
     current_user = Depends(get_current_user_object),
@@ -264,7 +263,7 @@ async def get_all_appointments(
 
 # ✅ Get appointment by ID
 
-@router.get("/{appointment_id}", response_model=DoctorAppointmentOut)
+@router.get("/appointment/{appointment_id}", response_model=DoctorAppointmentOut)
 async def get_appointment(
     appointment_id: int,
     db: AsyncSession = Depends(get_db),

@@ -6,7 +6,7 @@ from app.Help_center import help_center
 from app.points_rewards import user_points_rewards
 from app.patients_doctors import user_doctors
 from app.donation import user_donation
-# from app.Purchase import user_purchase
+from app.Purchase import user_purchase, user_cart
 
 
 app = FastAPI(title="MedoCRM API")
@@ -21,7 +21,9 @@ app.include_router(help_center.router)
 app.include_router(user_points_rewards.router)
 app.include_router(user_doctors.router)
 app.include_router(user_donation.router)
-# app.include_router(user_purchase.router)
+app.include_router(user_purchase.router)
+app.include_router(user_cart.router)
+
 
 @app.get("/")
 def root():

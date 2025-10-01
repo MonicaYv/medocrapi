@@ -166,7 +166,6 @@ async def set_default_payment_method(
         query = select(PaymentMethod).where(
             PaymentMethod.id == payment_method_id,
             PaymentMethod.user_id == user.id,
-            PaymentMethod.status == "active"
         )
         result = await db.execute(query)
         payment_method = result.scalars().first()
@@ -175,12 +174,12 @@ async def set_default_payment_method(
 
         await db.execute(
             update(PaymentMethod).where(
-                PaymentMethod.user_id == current_user.id,
+                PaymentMethod.user_id == user.id,
                 PaymentMethod.id != payment_method_id
             ).values(is_default=False)
         )
         payment_method.is_default = True
-        payment_method.updated_at = datetime.utcnow()
+        payment_method.updated_at = datetime.now()
         await db.commit()
         return {"message": "Payment method set as default successfully"}
     except Exception as e:

@@ -1,7 +1,8 @@
 from pydantic import BaseModel, EmailStr, ConfigDict
 from typing import Optional
 from datetime import datetime, date, time
-from typing import Optional, List
+from typing import Optional, List, Literal
+from decimal import Decimal
 
 class Token(BaseModel):
     access_token: str
@@ -100,12 +101,11 @@ class IssueOptionOut(IssueOptionBase):
         from_attributes = True
         
 class SupportTicketBase(BaseModel):
+    issue_option_id: int
     description: str
     image: Optional[str] = None
     status: Optional[str] = "open"
-    created_by_id: int
-    issue_option_id: int
-    user_id: int
+    created_by_id: Optional[int] = None
     assigned_to: Optional[int] = None
     
 class SupportTicketCreate(SupportTicketBase):
@@ -212,7 +212,7 @@ class PaymentMethodOut(BaseModel):
 # Donation
 # --------------------------------------------
 
-class DonationTypes(BaseModel):
+class DonationType(BaseModel):
     id: int
     name: str
     is_active: bool
@@ -368,6 +368,29 @@ class DoctorAppointmentOut(BaseModel):
     clinic_fee: Optional[float]
     home_fee: Optional[float]
     status: str
+
+    class Config:
+        from_attributes = True
+
+class CartItemBase(BaseModel):
+    medicine_id: str
+    quantity: int = 1
+    price: Decimal
+    original_price: Optional[Decimal] = None
+    prescription_status: Literal["Received", "Pending", "Required"]
+    is_generic: Optional[bool] = False
+
+class CartItemCreate(CartItemBase):
+    pass
+
+class CartItemUpdate(BaseModel):
+    quantity: Optional[int] = None
+    price: Optional[Decimal] = None
+
+class CartItemOut(CartItemBase):
+    id: int
+    created_at: Optional[datetime]
+    updated_at: Optional[datetime]
 
     class Config:
         orm_mode = True

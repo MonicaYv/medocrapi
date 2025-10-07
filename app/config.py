@@ -25,3 +25,10 @@ SMTP_USERNAME = os.getenv("SMTP_USERNAME")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
 SMTP_FROM = os.getenv("SMTP_FROM")
 EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "true").lower() == "true"
+
+
+COMPANY=os.getenv("COMPANY")
+GSTIN=os.getenv("GSTIN")
+ADDRESS=os.getenv("ADDRESS")
+CONTACT=os.getenv("CONTACT")
+EMAIL=os.getenv("EMAIL")

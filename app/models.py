@@ -1,5 +1,5 @@
 from sqlalchemy import (
-    Column,
+    Column, UniqueConstraint,
     Integer, DECIMAL,
     String, Text,
     Boolean, Enum,
@@ -7,7 +7,7 @@ from sqlalchemy import (
     Date, Time,
     ForeignKey,
     JSON, Enum,
-    Numeric,
+    Numeric, ARRAY,
 )
 import enum
 from datetime import time, datetime, date
@@ -17,6 +17,10 @@ import enum
 from sqlalchemy.orm import relationship, declarative_base
 
 Base = declarative_base()
+
+#-------------------------------------------------------------------------------
+# User Profile
+#--------------------------------------------------------------------------------
 
 class User(Base):
     __tablename__ = "registration_user"
@@ -45,6 +49,8 @@ class User(Base):
     claimed_coupons = relationship("CouponHistory", back_populates="user", cascade="all, delete")
     coupons = relationship("Coupon", back_populates="advertiser", cascade="all, delete")
     points_history = relationship("RewardHistory", back_populates="user", cascade="all, delete")
+    saved_locations = relationship("SavedLocation", back_populates="user", cascade="all, delete")
+    search_clicks = relationship("SearchHistory", back_populates="user", cascade="all, delete")
 
 class UserProfile(Base):
     __tablename__ = "registration_userprofile"
@@ -53,12 +59,14 @@ class UserProfile(Base):
     first_name = Column(String(255), nullable=False)
     last_name = Column(String(255), nullable=True)
     age = Column(Integer, nullable=True)
-    dob = Column(Date, nullable=True)
     gender = Column(String(16), nullable=True)
     pan_number = Column(String(32), nullable=True)
     profile_photo_path = Column(String(255), nullable=True)
     referral_code = Column(String(64), nullable=True)
     otp = Column(String(16), nullable=True)
+    payment_notifications = Column(Boolean, default=True)
+    location_notification = Column(Boolean, default=True)
+    
     
     user = relationship("User", back_populates="profile")
     addresses = relationship("UserAddress", back_populates="user_profile", cascade="all, delete")
@@ -79,7 +87,21 @@ class UserAddress(Base):
     address = Column(String, nullable=False)
     
     user_profile = relationship("UserProfile", back_populates="addresses")
-
+    
+class UserReferral(Base):
+    __tablename__ = "registration_userreferral"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    referrer_id = Column(Integer, ForeignKey("registration_user.id", ondelete="CASCADE"), nullable=False)
+    referred_id = Column(Integer, ForeignKey("registration_user.id", ondelete="CASCADE"), nullable=False)
+    created_at = Column(DateTime, default=datetime.now, nullable=False)
+    
+    referrer = relationship("User", foreign_keys=[referrer_id])
+    referred = relationship("User", foreign_keys=[referred_id])
+    
+#--------------------------------------------------------------------------------
+# Help Center
+#--------------------------------------------------------------------------------
 
 class IssueType(Base):
     __tablename__ = "support_issuetype"
@@ -182,7 +204,6 @@ class EmailSupport(Base):
     priority = Column(String, default="normal")
     created_at = Column(DateTime, default=datetime.now)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
-    
     # Relationship
     user = relationship("User")
     
@@ -230,6 +251,10 @@ class TicketChatMessage(Base):
     sender = relationship("User", backref="sent_ticket_messages")
     
     
+#-------------------------------------------------------------------------------
+# Payment Methods
+#--------------------------------------------------------------------------------
+
 class PaymentMethod(Base):
     __tablename__ = "payment_methods"
     
@@ -256,12 +281,23 @@ class PaymentMethodEnum(str, enum.Enum):
     Wallet = "Wallet"
     Other = "Other"
 
-
 class PaymentStatusEnum(str, enum.Enum):
     Success = "Success"
     Failed = "Failed"
+    
+#-------------------------------------------------------------------------------
+# Donation 
+#--------------------------------------------------------------------------------
+class NGOService(Base):
+    __tablename__ = "ngo_services"
 
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(100), unique=True, nullable=False)
+    is_active = Column(Boolean, default=True)
 
+    def __repr__(self):
+        return f"<NGOService(name='{self.name}')>"
+    
 class Donation(Base):
     __tablename__ = "donate_donation"
 
@@ -275,10 +311,10 @@ class Donation(Base):
     platform_fee = Column(DECIMAL(12, 2), nullable=True)
     amount_to_ngo = Column(DECIMAL(12, 2), nullable=True)
     transaction_id = Column(String(64), unique=True, nullable=True)
-    payment_method = Column(Enum(PaymentMethodEnum), default=PaymentMethodEnum.UPI, nullable=False)
+    payment_method = Column(String(32), default="UPI", nullable=False)
     pan_number = Column(String(32), nullable=True)
     pan_document = Column(String(255), nullable=True)
-    payment_status = Column(Enum(PaymentStatusEnum), default=PaymentStatusEnum.Success, nullable=False)
+    payment_status = Column(String(16), default="Success", nullable=False)
     saved = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.now)
 
@@ -352,6 +388,15 @@ class PostStatusEnum(str, enum.Enum):
     CLOSED = "Closed"
     PAUSED = "Paused"
 
+class PostType(Base):
+    __tablename__ = "ngopost_posttypeoption"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False, unique=True)
+    is_active = Column(Boolean, default=True)
+
+    posts = relationship("NGOPost", back_populates="post_type")
+
 class NGOPost(Base):
     __tablename__ = "ngopost_ngopost"
 
@@ -363,7 +408,7 @@ class NGOPost(Base):
     tags = Column(String(255), nullable=True)
 
     post_type_id = Column(Integer, ForeignKey("ngopost_posttypeoption.id", ondelete="SET NULL"), nullable=True)
-    donation_frequency = Column(Enum(DonationFrequencyEnum), default=DonationFrequencyEnum.ONETIME, nullable=False)
+    donation_frequency = Column(String)
 
     target_donation = Column(DECIMAL(12, 2), nullable=False)
     donation_received = Column(DECIMAL(12, 2), default=0.00)
@@ -381,7 +426,7 @@ class NGOPost(Base):
     start_date = Column(Date, nullable=False)
     end_date = Column(Date, nullable=False)
 
-    status = Column(Enum(PostStatusEnum), default=PostStatusEnum.ONGOING, nullable=False)
+    status = Column(String, default="Ongoing", nullable=False)
 
     creative1 = Column(String(255), nullable=False)
     creative2 = Column(String(255), nullable=True)
@@ -389,22 +434,104 @@ class NGOPost(Base):
     views = Column(Integer, default=0)
     saved = Column(Boolean, default=False)
     last_downloaded = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.now)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
 
     # Relationships
     user = relationship("User", backref="ngo_posts")
-    post_type = relationship("DonationTypes", back_populates="posts")
-    donations = relationship("Donation", back_populates="ngopost", cascade="all, delete")    
+    post_type = relationship("PostType", back_populates="posts")
+    donations = relationship("Donation", back_populates="ngopost", cascade="all, delete")
+    country = relationship("CountryOption", backref="posts")
+    state = relationship("StateOption", backref="posts")
+    city = relationship("CityOption", backref="posts")
+    age_group = relationship("AgeOption", backref="posts")
+    gender = relationship("GenderOption", backref="posts")
+    spending_power = relationship("SpendingPowerOption", backref="posts") 
 
-class DonationTypes(Base):
-    __tablename__ = "ngopost_posttypeoption"
+class NGOProfile(Base):
+    __tablename__ = "registration_ngoprofile"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("registration_user.id", ondelete="CASCADE"))
+    ngo_name = Column(String(255), nullable=False)
+    ngo_services_id = Column(Integer, ForeignKey("ngo_services.id"), nullable=True)
+    website_url = Column(String(255), nullable=True)
+    address = Column(Text, nullable=True)
+    city = Column(String(128), nullable=True)
+    state = Column(String(128), nullable=True)
+    pincode = Column(String(20), nullable=True)
+    country = Column(String(128), nullable=True)
+    ngo_registration_number = Column(String(128), nullable=True)
+    ngo_registration_doc_path = Column(String(255), nullable=True)
+    ngo_registration_doc_virus_scanned = Column(Boolean, default=False)
+    pan_number = Column(String(32), nullable=True)
+    pan_doc_path = Column(String(255), nullable=True)
+    pan_doc_virus_scanned = Column(Boolean, default=False)
+    gst_number = Column(String(32), nullable=True)
+    gst_doc_path = Column(String(255), nullable=True)
+    gst_doc_virus_scanned = Column(Boolean, default=False)
+    tan_number = Column(String(32), nullable=True)
+    tan_doc_path = Column(String(255), nullable=True)
+    tan_doc_virus_scanned = Column(Boolean, default=False)
+    section8_number = Column(String(128), nullable=True)
+    section8_doc_path = Column(String(255), nullable=True)
+    section8_doc_virus_scanned = Column(Boolean, default=False)
+    doc_12a_number = Column(String(128), nullable=True)
+    doc_12a_path = Column(String(255), nullable=True)
+    doc_12a_virus_scanned = Column(Boolean, default=False)
+    brand_image_path = Column(String(255), nullable=True)
+    brand_image_virus_scanned = Column(Boolean, default=False)
+    brand_description = Column(Text, nullable=True)
+    email_otp = Column(String(16), nullable=True)
+    referral_code = Column(String(64), nullable=True)
+
+    # Relationships
+    ngo_services = relationship("NGOService")
+
+class ContactPerson(Base):
+    __tablename__ = "registration_contactperson"
+
+    id = Column(Integer, primary_key=True, index=True)
+    profile_type = Column(String(32), nullable=False)  # choices handled in API validation
+    profile_id_id = Column(Integer, ForeignKey("registration_user.id", ondelete="CASCADE"))
+    name = Column(String(255), nullable=False)
+    phone_country_code = Column(String(8), nullable=True)
+    phone_number = Column(String(20), nullable=True)
+    role = Column(String(128), nullable=True)
+    otp = Column(String(16), nullable=True)
+    referral_code = Column(String(64), nullable=True)
+    email_otp = Column(String(16), nullable=True)
+#-------------------------------------------------------------------------------
+# Points + Points History
+#--------------------------------------------------------------------------------
+
+class RewardHistory(Base):
+    __tablename__ = "points_pointshistory"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("registration_user.id", ondelete="CASCADE"), nullable=False)
+    action_type_id = Column(Integer, ForeignKey("points_pointsactiontype.id", ondelete="CASCADE"), nullable=False)
+    points = Column(Integer, nullable=False)
+    timestamp = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    
+    user = relationship("User", back_populates="points_history")
+    action_type = relationship("PointsActionType", back_populates="history")
+
+    def __str__(self):
+        return f"{self.user.email} - {self.action_type.action_type} - {self.points} pts"
+
+class PointsActionType(Base):
+    __tablename__ = "points_pointsactiontype"
     
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, nullable=False, unique=True)
-    is_active = Column(Boolean, default=True)
+    action_type = Column(String(32), unique=True, nullable=False)
+    default_points = Column(Integer, default=0, nullable=False)
 
-    posts = relationship("NGOPost", back_populates="post_type")
+    history = relationship("RewardHistory", back_populates="action_type", cascade="all, delete")
+
+    def __str__(self):
+        return f"{self.action_type} - {self.default_points} pts"
+
 
 class PointsBadge(Base):
     __tablename__ = "points_pointsbadge"
@@ -415,6 +542,10 @@ class PointsBadge(Base):
     max_points = Column(Integer, nullable=True)  
     description = Column(String, nullable=True)
     image_url = Column(String(255), nullable=True) 
+    
+#-------------------------------------------------------------------------------
+# Rewards and Coupons
+#--------------------------------------------------------------------------------
     
 class CategoryOption(Base):
     __tablename__ = "coupon_categoryoption"
@@ -517,8 +648,8 @@ class Coupon(Base):
 
     # Metadata
     saved = Column(Boolean, default=False, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=datetime.now, nullable=False)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, nullable=False)
 
     # Relationships
     advertiser = relationship("User", back_populates="coupons")
@@ -564,35 +695,12 @@ class CouponHistory(Base):
 
     user = relationship("User", back_populates="claimed_coupons")
     coupon = relationship("Coupon", back_populates="claims")
-
-class RewardHistory(Base):
-    __tablename__ = "points_pointshistory"
-
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("registration_user.id", ondelete="CASCADE"), nullable=False)
-    action_type_id = Column(Integer, ForeignKey("points_pointsactiontype.id", ondelete="CASCADE"), nullable=False)
-    points = Column(Integer, nullable=False)
-    timestamp = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    
-    user = relationship("User", back_populates="points_history")
-    action_type = relationship("PointsActionType", back_populates="history")
-
-    def __str__(self):
-        return f"{self.user.email} - {self.action_type.action_type} - {self.points} pts"
-
-class PointsActionType(Base):
-    __tablename__ = "points_pointsactiontype"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    action_type = Column(String(32), unique=True, nullable=False)  # choices handled at app level
-    default_points = Column(Integer, default=0, nullable=False)
-
-    history = relationship("RewardHistory", back_populates="action_type", cascade="all, delete")
-
-    def __str__(self):
-        return f"{self.action_type} - {self.default_points} pts"
     
 
+#-------------------------------------------------------------------------------
+# Patients and Doctor
+#--------------------------------------------------------------------------------
+    
 class DoctorProfile(Base):
     __tablename__ = "doctor_profile"
     id = Column(Integer, primary_key=True, index=True)
@@ -604,39 +712,27 @@ class DoctorProfile(Base):
     specialties = Column(String, nullable=False)
 
     user = relationship("User")
-    
-class HealthIssues(Base):
-    __tablename__ = "health_issues"
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, nullable=False, unique=True)
-    
-class DoctorAppointment(Base):
-    __tablename__ = "doctor_appointments"
 
+class PatientProfile(Base):
+    __tablename__ = "patient_profile"
     id = Column(Integer, primary_key=True, index=True)
-    doctor_id = Column(String(50), nullable=False)
-    name = Column(String(100), nullable=False)
-    specialization = Column(String(100))
-    experience_years = Column(Integer)
-    gender = Column(String(20))
-    rating = Column(DECIMAL(2,1))
-    order_id = Column(String(50), unique=True, nullable=False)
-    appointment_date = Column(Date, nullable=False)
-    appointment_start_time = Column(Time, nullable=False)
-    appointment_end_time = Column(Time, nullable=False)
-    created_at = Column(TIMESTAMP, server_default=func.now())
-    location = Column(String(255))
-    distance_km = Column(DECIMAL(5,2))
-    travel_time_mins = Column(Integer)
-    clinic_fee = Column(DECIMAL(10,2))
-    home_fee = Column(DECIMAL(10,2))
-    status = Column(String(20), default="Pending")
+    user_id = Column(Integer, ForeignKey("registration_user.id", ondelete="CASCADE"))
+    first_name = Column(String, nullable=False)
+    last_name = Column(String, nullable=False)
+    gender = Column(String, nullable=False)
+    age = Column(Integer, nullable=False)
+    relation = Column(String, nullable=True)
+    user = relationship("User")  
+    
+#-------------------------------------------------------------------------------
+# Purchase
+#--------------------------------------------------------------------------------
 
 class CartItem(Base):
     __tablename__ = "cart_items"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(Integer, nullable=False)
+    user_id = Column(Integer, ForeignKey("registration_user.id", ondelete="CASCADE"), nullable=False)
     medicine_id = Column(String(24), nullable=False)
     quantity = Column(Integer, nullable=False, default=1)
     price = Column(Numeric(10, 2), nullable=False)
@@ -646,3 +742,119 @@ class CartItem(Base):
     created_at = Column(TIMESTAMP, nullable=True, server_default=func.current_timestamp())
     updated_at = Column(TIMESTAMP, nullable=True, server_default=func.current_timestamp(), onupdate=func.current_timestamp())
 
+class ConcernList(Base):
+    __tablename__ = "concern_list"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    category = Column(String(100), nullable=False)
+
+class TopSellingCategory(Base):
+    __tablename__ = "top_selling_category"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    category = Column(String(100), nullable=False)
+
+class CancelReason(Base):
+    __tablename__ = "cancel_reason"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    reason = Column(String(255), nullable=False)
+
+class BrandList(Base):
+    __tablename__ = "brand_list"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(100), nullable=False)
+
+
+#--------------------------------------------------------------------------------
+# Advance Wallet
+#--------------------------------------------------------------------------------
+
+class WalletTransaction(Base):
+    __tablename__ = "wallet_transactions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("registration_user.id", ondelete="CASCADE"))
+    order_id = Column(String(64), nullable=True)
+    tranx_id = Column(String(64), unique=True, nullable=False)
+    amount = Column(DECIMAL(12, 2), nullable=False)
+    transaction_type = Column(String(50), nullable=False)
+    points_earned = Column(DECIMAL(10, 2), default=0.0)
+    current_balance = Column(DECIMAL(12, 2), nullable=False)
+    created_at = Column(DateTime, default=datetime.now, nullable=False)
+
+    user = relationship("User", backref="wallet_transactions")
+
+#-------------------------------------------------------------------------------
+# Appointments
+#--------------------------------------------------------------------------------
+
+class Specialization(Base):
+    __tablename__ = "specializations"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, unique=True, nullable=False)
+
+
+class HealthIssue(Base):
+    __tablename__ = "health_issues"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, unique=True, nullable=False)
+
+
+class DoctorAppointment(Base):
+    __tablename__ = "doctor_appointments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("registration_user.id", ondelete="CASCADE"), nullable=False)
+    address_id = Column(Integer, ForeignKey("registration_useraddress.id", ondelete="CASCADE"), nullable=False)
+
+    description = Column(Text)
+    consultation_type = Column(String(20))   # clinic_visit | home_visit
+    service_type = Column(String(20))        # emergency | normal
+    preferred_date_time = Column(TIMESTAMP)  # UTC/IST handled in app
+    budget = Column(Numeric)
+    status = Column(String(20), default="Pending")
+    created_at = Column(TIMESTAMP, server_default=func.now())
+
+    # Relationships
+    user = relationship("User", backref="appointments")
+    address = relationship("UserAddress", backref="appointments")
+    health_issues = relationship("HealthIssue", secondary="appointment_health_issues", backref="appointments")
+    specializations = relationship("Specialization", secondary="appointment_specializations", backref="appointments")
+
+
+class AppointmentHealthIssues(Base):
+    __tablename__ = "appointment_health_issues"
+    appointment_id = Column(Integer, ForeignKey("doctor_appointments.id", ondelete="CASCADE"), primary_key=True)
+    health_issue_id = Column(Integer, ForeignKey("health_issues.id", ondelete="CASCADE"), primary_key=True)
+
+
+class AppointmentSpecializations(Base):
+    __tablename__ = "appointment_specializations"
+    appointment_id = Column(Integer, ForeignKey("doctor_appointments.id", ondelete="CASCADE"), primary_key=True)
+    specialization_id = Column(Integer, ForeignKey("specializations.id", ondelete="CASCADE"), primary_key=True)
+
+#--------------------------------------------------------------------------------
+# Maps
+#--------------------------------------------------------------------------------
+
+class SavedLocation(Base):
+    __tablename__ = "saved_location"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("registration_user.id", ondelete="CASCADE"))
+    mongo_id = Column(String(100), nullable=False)
+    amenity_type = Column(String(20), nullable=False)
+    saved_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    __table_args__ = (UniqueConstraint("user_id", "mongo_id", name="uq_saved_location"),)
+
+    user = relationship("User", back_populates="saved_locations")
+    
+class SearchHistory(Base):
+    __tablename__ = "search_history"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("registration_user.id", ondelete="CASCADE"))
+    mongo_id = Column(String(100), nullable=False)
+    amenity_type = Column(String(20), nullable=False)
+    clicked_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    __table_args__ = (UniqueConstraint("user_id", "mongo_id", name="uq_search_history"),)
+
+    user = relationship("User", back_populates="search_clicks")

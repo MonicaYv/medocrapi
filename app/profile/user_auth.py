@@ -1,15 +1,15 @@
 from fastapi import APIRouter, Header, Depends, status, HTTPException, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.future import select
 import asyncio
 import jwt
 import re
+import uuid
 from fastapi.security import OAuth2PasswordBearer
 from datetime import datetime, timedelta
 from passlib.hash import pbkdf2_sha256
 import random, string
-from app.models import User, UserProfile, UserAddress
+from app.models import User, UserProfile, UserAddress, RewardHistory, UserReferral, PointsActionType
 from app.schemas import (
     ContactInfo, 
     RegisterFinal, 
@@ -32,6 +32,10 @@ router = APIRouter(
     prefix="/auth",
     tags=["Authentication"]
 )
+
+
+def generate_referral_code():
+    return str(uuid.uuid4())[:8].upper()
 
 def is_email(contact: str) -> bool:
     return bool(re.match(r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$', contact))
@@ -101,30 +105,61 @@ async def register_user(data: RegisterFinal, db: AsyncSession = Depends(get_db),
         age=data.age,
         gender=data.gender,
         otp=data.otp_token,
+        referral_code=generate_referral_code()
     )
     db.add(user_profile)
+    await db.flush()
+    
+    if data.referral_code:
+        referrer_query = await db.execute(
+            select(UserProfile).where(UserProfile.referral_code == data.referral_code)
+        )
+        referrer_profile = referrer_query.scalars().first()
+        if referrer_profile and referrer_profile.user_id != new_user.id:
+            referral_entry = UserReferral(
+                referrer_id=referrer_profile.user_id,
+                referred_id=new_user.id
+            )
+            db.add(referral_entry)
+            
+            # Reward points to the referrer
+            action_type_query = await db.execute(
+                select(PointsActionType).where(PointsActionType.action_type == "Referral")
+            )
+            referral_action = action_type_query.scalars().first()
+            if referral_action:
+                reward = RewardHistory(
+                    user_id=referrer_profile.user_id,
+                    action_type_id=referral_action.id,
+                    points=50,
+                    timestamp=datetime.now()
+                )
+                db.add(reward)
+            
     await db.commit()
     await db.refresh(user_profile)
     await db.refresh(new_user)
+    
     return  {
-        "id": user_profile.id,
+        "id": new_user.id,
         "first_name": user_profile.first_name,
         "last_name": user_profile.last_name,
-        "email": new_user.email
+        "email": new_user.email,
+        "referral_code": user_profile.referral_code
     }
 
 @router.post("/login/request-otp", status_code=status.HTTP_200_OK)
 async def request_login_otp(data: ContactInfo, db: AsyncSession = Depends(get_db), _auth=Depends(check_authorization_key)):
     if is_email(data.contact):
-        query = select(User.id, User.email, User.phone_number).where(User.email == data.contact)
+        query = select(User.id, User.email, User.phone_number, User.is_active).where(User.email == data.contact)
     else:
-        query = select(User.id, User.email, User.phone_number).where(User.phone_number == data.contact)
+        query = select(User.id, User.email, User.phone_number, User.is_active).where(User.phone_number == data.contact)
 
     result = await db.execute(query)
     user = result.mappings().first()
 
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found or not set up for OTP login.")
+    if not user or not user['is_active']:
+        raise HTTPException(status_code=403, detail="User account is inactive. Please contact support.")
 
     otp_secret = generate_otp_secret()
     otp = generate_otp(otp_secret)
@@ -193,7 +228,6 @@ async def get_current_user_object(current_user_email: str = Depends(get_current_
     if not profile:
         raise HTTPException(status_code=404, detail="User profile not found")
     return user, profile
-
 
 @router.post("/add-address", response_model=AddressOut, status_code=201)
 async def add_address(

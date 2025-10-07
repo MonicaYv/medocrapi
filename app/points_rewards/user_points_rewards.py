@@ -40,9 +40,9 @@ async def get_coupon_history(
     db: AsyncSession = Depends(get_db),
     _auth=Depends(check_authorization_key),
     current_user: UserProfile = Depends(get_current_user_object)):
-
+    user, _ = current_user
     try:
-        query = select(CouponHistory).where(CouponHistory.user_id == current_user.id)
+        query = select(CouponHistory).where(CouponHistory.user_id == user.id)
         result = await db.execute(query)
         coupon_history = result.scalars().all()
         return coupon_history
@@ -62,16 +62,17 @@ async def get_reward_history(
     offset: Optional[int] = Query(0, description="Number of records to skip")
 ):
     """Get user's reward history with optional filters and total points"""
+    user, _ = current_user
     try:
         # Calculate total points for the user (all time)
         total_query = select(func.sum(RewardHistory.points)).where(
-            RewardHistory.user_id == current_user.id
+            RewardHistory.user_id == user.id
         )
         total_result = await db.execute(total_query)
         total_points = total_result.scalar() or 0
         
         # Build the base query for filtered data
-        base_query = select(RewardHistory).where(RewardHistory.user_id == current_user.id)
+        base_query = select(RewardHistory).where(RewardHistory.user_id == user.id)
         
         # Apply filters
         filters = []
@@ -90,7 +91,7 @@ async def get_reward_history(
         
         # Calculate filtered total points
         filtered_total_query = select(func.sum(RewardHistory.points)).where(
-            RewardHistory.user_id == current_user.id
+            RewardHistory.user_id == user.id
         )
         if filters:
             filtered_total_query = filtered_total_query.where(and_(*filters))
@@ -107,7 +108,7 @@ async def get_reward_history(
         reward_history = result.scalars().all()
         
         # Debug: Print reward history data
-        print(f"Found {len(reward_history)} reward history records for user {current_user.id}")
+        print(f"Found {len(reward_history)} reward history records for user {user.id}")
         print(f"Total points (all time): {total_points}")
         print(f"Filtered total points: {filtered_total_points}")
         for reward in reward_history:

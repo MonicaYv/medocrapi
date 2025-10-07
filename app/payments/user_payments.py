@@ -115,7 +115,7 @@ async def update_payment_method(
                 )
             payment_method.is_default = payment_data.is_default
 
-        payment_method.updated_at = datetime.utcnow()
+        payment_method.updated_at = datetime.now()
         await db.commit()
         await db.refresh(payment_method)
         return payment_method
@@ -145,7 +145,7 @@ async def delete_payment_method(
             raise HTTPException(status_code=404, detail="Payment method not found")
 
         payment_method.status = "deleted"
-        payment_method.updated_at = datetime.utcnow()
+        payment_method.updated_at = datetime.now()
         await db.commit()
         return {"message": "Payment method deleted successfully"}
     except Exception as e:

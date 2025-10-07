@@ -2,6 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from typing import List
+from decimal import Decimal
+
 from app.database import get_db
 from app.models import CartItem
 from app.schemas import CartItemCreate, CartItemUpdate, CartItemOut
@@ -9,7 +11,7 @@ from app.profile.user_auth import get_current_user_object
 
 router = APIRouter(
     prefix="/cart",
-    tags=["cart"]
+    tags=["Cart"]
 )
 
 @router.post("/add", response_model=CartItemOut)
@@ -81,5 +83,4 @@ async def cart_list(
     query = await db.execute(
         select(CartItem).where(CartItem.user_id == user.id)
     )
-    items = query.scalars().all()
-    return items
+    return query.scalars().all()

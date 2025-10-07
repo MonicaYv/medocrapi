@@ -11,9 +11,12 @@ from app.models import (
 from app.schemas import (
     IssueTypeOut, SupportTicketOut, IssueOptionOut,
     ChatSupportOut, ChatSupportCreate,
-    EmailSupportOut, EmailSupportUpdateStatus, EmailSupportCreate
+    EmailSupportOut, EmailSupportUpdateStatus, EmailSupportCreate,
+    FAQOut, 
 )
-from app.profile.user_auth import get_current_user_object, check_authorization_key, get_current_user
+from app.profile.user_auth import (
+    get_current_user_object, check_authorization_key, get_current_user
+)
 from app.email_utils import send_email
 from uuid import uuid4
 from pathlib import Path
@@ -54,7 +57,7 @@ async def get_issue_options(
 
 @router.post("/create_support_ticket", response_model=SupportTicketOut)
 async def create_support_ticket(
-    ticket: str = Form(...),  # <-- ticket comes in as a JSON string
+    ticket: str = Form(...),
     image: UploadFile | None = File(None),
     db: AsyncSession = Depends(get_db),
     _auth=Depends(check_authorization_key),
@@ -108,7 +111,6 @@ async def get_all_support_tickets(
     result = await db.execute(query)
     return result.scalars().all()
 
-
 @router.get("/chat_history", response_model=List[ChatSupportOut])
 async def chat_history(
     chat_session_id: Optional[str] = Query(None),
@@ -126,7 +128,6 @@ async def chat_history(
     query = query.order_by(ChatSupport.created_at.asc())
     result = await db.execute(query)
     return result.scalars().all()
-
 
 @router.post("/send_message", response_model=ChatSupportOut)
 async def send_message(

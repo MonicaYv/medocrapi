@@ -1,17 +1,18 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException
 from typing import List, Optional
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from app.database import get_mongo_db
 from datetime import datetime
 from app.database import get_db
-from app.profile.user_auth import get_current_user_object
+from app.profile.user_auth import get_current_user_object, check_authorization_key
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.models import TopSellingCategory, ConcernList, CancelReason, BrandList
+from app.schemas import TopSellingCategoryOut, ConcernListOut, CancelReasonOut
 
 router = APIRouter(
     prefix="/purchase",
     tags=["purchase"]
 )
-
 
 # Search Medicines (also logs search history)
 @router.get("/search", response_model=List[dict])
@@ -40,7 +41,7 @@ async def search_medicine(
         {
             "$push": {
                 "history": {
-                    "$each": [{"name": name, "searched_at": datetime.utcnow()}],
+                    "$each": [{"name": name, "searched_at": datetime.now()}],
                     "$slice": -20  # keep only last 20 searches
                 }
             }
@@ -57,13 +58,12 @@ async def get_search_history(
     db: AsyncSession = Depends(get_db),
     current_user_data: tuple = Depends(get_current_user_object),
 ):
-    user, profile = current_user_data
+    user, _ = current_user_data
     user_id = str(user.id)
 
     collection = mongo_db["search_history"]
     doc = await collection.find_one({"user_id": user_id}, {"_id": 0})
     return doc.get("history", []) if doc else []
-
 
 # Product Details
 @router.get("/product_details")
@@ -74,7 +74,7 @@ async def product_details(
     collection = mongo_db["master_medicine"]
     product = await collection.find_one({"product_id": product_id}, {"_id": 0})
     if not product:
-        return {"error": "Product not found"}
+        raise HTTPException(status_code=404, detail="Product not found")
     return product
 
 # Medicine List (filterable)
@@ -101,8 +101,7 @@ async def medicine_list(
         ]
 
     cursor = collection.find(filters, {"_id": 0}).limit(limit)
-    results = await cursor.to_list(length=limit)
-    return results
+    return await cursor.to_list(length=limit)
 
 # Similar Products (by salt)
 @router.get("/similar_product")
@@ -142,3 +141,50 @@ async def similar_product(
     results = await cursor.to_list(length=limit)
     return results
 
+@router.get("/concern_list")
+async def concern_list(
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_user_object),
+    _auth=Depends(check_authorization_key)
+):
+    result = await db.execute(
+        ConcernList.__table__.select()
+    )
+    concerns = result.fetchall()
+    return [{"id": c.id, "category": c.category} for c in concerns]
+
+@router.get("/top_selling_category")
+async def top_selling_category(
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_user_object),
+    _auth=Depends(check_authorization_key)
+):
+    result = await db.execute(
+        TopSellingCategory.__table__.select()
+    )
+    categories = result.fetchall()
+    return [{"id": c.id, "category": c.category} for c in categories]
+
+@router.get("/cancel_reason")       
+async def cancel_reason(
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_user_object),
+    _auth=Depends(check_authorization_key)
+):
+    result = await db.execute(
+        CancelReason.__table__.select()
+    )
+    reasons = result.fetchall()
+    return [{"id": r.id, "reason": r.reason} for r in reasons]
+
+@router.get("/brand_list")
+async def brand_list(
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_user_object),
+    _auth=Depends(check_authorization_key)
+):
+    result = await db.execute(
+        BrandList.__table__.select()
+    )
+    brands = result.fetchall()
+    return [{"id": b.id, "brand": b.brand} for b in brands]

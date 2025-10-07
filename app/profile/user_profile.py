@@ -20,12 +20,10 @@ async def get_my_profile(
 ):
     user, profile = current_user
     return UserProfileOut(
-        id=profile.id,
-        user_id=user.id,
+        id=user.id,
         first_name=profile.first_name,
         last_name=profile.last_name,
         age=profile.age,
-        dob=profile.dob,
         gender=profile.gender,
         pan_number=profile.pan_number,
         profile_photo_path=profile.profile_photo_path,
@@ -44,15 +42,13 @@ async def update_profile(
     user, profile = current_user
     update_dict = profile_data.model_dump(exclude_unset=True)
     
-    profile_fields = ['first_name', 'last_name', 'dob', 'gender', 'pan_number', 'age', 
-                        'profile_photo_path', 'referral_code', 'address', 'city', 'state', 'pincode', 'country']
+    profile_fields = ['first_name', 'last_name', 'gender', 'pan_number', 'age']
     for field in profile_fields:
         if field in update_dict:
             setattr(profile, field, update_dict[field])
 
-    # Update User fields (notifications, quite_mode)
-    user_fields = ['inapp_notifications', 'email_notifications', 'push_notifications',
-                    'promotions_and_offers', 'quite_mode']
+    # Update User fields
+    user_fields = ['email', 'phone_number']
     for field in user_fields:
         if field in update_dict:
             setattr(user, field, update_dict[field])
@@ -62,12 +58,10 @@ async def update_profile(
     await db.refresh(user)
 
     return UserProfileOut(
-        id=profile.id,
-        user_id=user.id,
+        id=user.id,
         first_name=profile.first_name,
         last_name=profile.last_name,
         age=profile.age,
-        dob=profile.dob,
         gender=profile.gender,
         pan_number=profile.pan_number,
         profile_photo_path=profile.profile_photo_path,
@@ -75,7 +69,7 @@ async def update_profile(
         email=user.email
     )
 
-# # POST /profile/upload_photo
+# POST /profile/upload_photo
 @router.post("/upload_photo", response_model=UserProfileOut)
 async def upload_photo(
     file: UploadFile = File(...),
@@ -95,12 +89,10 @@ async def upload_photo(
     await db.refresh(profile)
     await db.refresh(user)
     return UserProfileOut(
-        id=profile.id,
-        user_id=user.id,
+        id=user.id,
         first_name=profile.first_name,
         last_name=profile.last_name,
         age=profile.age,
-        dob=profile.dob,
         gender=profile.gender,
         pan_number=profile.pan_number,
         profile_photo_path=profile.profile_photo_path,
@@ -108,7 +100,7 @@ async def upload_photo(
         email=user.email
     )
 
-# # DELETE /profile/remove_photo
+# DELETE /profile/remove_photo
 @router.delete("/remove_photo", response_model=UserProfileOut)
 async def remove_photo(
     current_user=Depends(get_current_user_object),
@@ -125,12 +117,10 @@ async def remove_photo(
         await db.commit()
         await db.refresh(profile)
     return UserProfileOut(
-        id=profile.id,
-        user_id=user.id,
+        id=user.id,
         first_name=profile.first_name,
         last_name=profile.last_name,
         age=profile.age,
-        dob=profile.dob,
         gender=profile.gender,
         pan_number=profile.pan_number,
         profile_photo_path=profile.profile_photo_path,
@@ -162,12 +152,10 @@ async def update_photo(
     await db.refresh(profile)
     await db.refresh(user)
     return UserProfileOut(
-        id=profile.id,
-        user_id=user.id,
+        id=user.id,
         first_name=profile.first_name,
         last_name=profile.last_name,
         age=profile.age,
-        dob=profile.dob,
         gender=profile.gender,
         pan_number=profile.pan_number,
         profile_photo_path=profile.profile_photo_path,

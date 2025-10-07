@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, ConfigDict
+from pydantic import BaseModel, EmailStr, ConfigDict, Field
 from typing import Optional
 from datetime import datetime, date, time
 from typing import Optional, List, Literal
@@ -18,16 +18,15 @@ class RegisterFinal(BaseModel):
     phone_number: str
     otp: str
     otp_token: str 
+    referral_code: Optional[str] = None
     gender: Optional[str] = None
     age: Optional[int] = None    
 
 class UserProfileOut(BaseModel):
     id: int
-    user_id: int
     first_name: str
     last_name: Optional[str] = None
     age: Optional[int] = None
-    dob: Optional[date] = None
     gender: Optional[str] = None
     pan_number: Optional[str] = None
     profile_photo_path: Optional[str] = None
@@ -40,25 +39,15 @@ class VerifyLoginOTP(BaseModel):
     contact: str
     otp: str
         
-class UpdateProfileRequest(BaseModel):
+class UserProfileUpdate(BaseModel):
     first_name: Optional[str] = None
     last_name: Optional[str] = None
-    dob: Optional[date] = None
+    age: Optional[int] = None
     gender: Optional[str] = None
     pan_number: Optional[str] = None
-    address: Optional[str] = None
-    city: Optional[str] = None
-    state: Optional[str] = None
-    pincode: Optional[str] = None
-    country: Optional[str] = None
-    age: Optional[int] = None
-    inapp_notifications: Optional[bool] = None
-    email_notifications: Optional[bool] = None
-    push_notifications: Optional[bool] = None
-    promotions_and_offers: Optional[bool] = None
-    quite_mode: Optional[bool] = None
-
-UserProfileUpdate = UpdateProfileRequest
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    
 
 class AddressBase(BaseModel):
     address_type: str
@@ -156,8 +145,11 @@ class EmailSupportOut(BaseModel):
         from_attributes = True
         
 class EmailSupportUpdateStatus(BaseModel):
-    status: str  # pending, replied, closed
+    status: str = "pending" # pending, replied, closed
     
+# --------------------------------------------
+# FAQ
+# --------------------------------------------    
 
 class FAQBase(BaseModel):
     question: str
@@ -171,7 +163,7 @@ class FAQOut(FAQBase):
     created_at: datetime
     updated_at: datetime
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 # --------------------------------------------
 # Payments
@@ -212,7 +204,7 @@ class PaymentMethodOut(BaseModel):
 # Donation
 # --------------------------------------------
 
-class DonationType(BaseModel):
+class PostTypeOut(BaseModel):
     id: int
     name: str
     is_active: bool
@@ -222,7 +214,7 @@ class DonationType(BaseModel):
 class DonationOut(BaseModel):
     id: int
     amount: int
-    order_id: int
+    order_id: str
     payment_date: datetime
     gst: int
     platform_fee: int
@@ -261,7 +253,117 @@ class DonationBillOut(BaseModel):
     class Config:
         from_attributes = True
     
-    
+class NGOPostResponse(BaseModel):
+    id: int
+    user_id: int
+    header: str
+    description: str
+    tags: Optional[str] = None
+    post_type: str
+
+    donation_frequency: str
+    target_donation: Decimal
+    donation_received: Decimal
+
+    country: Optional[str] = None
+    state: Optional[str] = None
+    city: Optional[str] = None
+    pincode: str
+
+    age_group: Optional[str] = None
+    gender: Optional[str] = None
+    spending_power: Optional[str] = None
+
+    start_date: date
+    end_date: date
+    status: str
+
+    creative1: str
+    creative2: Optional[str] = None
+
+    views: int
+    saved: bool
+    last_downloaded: Optional[datetime] = None
+    created_at: datetime
+    updated_at: datetime
+    ngo_name: str
+    ngo_city: Optional[str] = None
+    ngo_state: Optional[str] = None
+    ngo_country: Optional[str] = None
+    ngo_pincode: Optional[str] = None
+    ngo_address: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+        
+class DonationBillOut(BaseModel):
+    receipt_no: str = Field(..., example="NGO-101")
+    date: str = Field(..., example="06-Oct-2025")
+    ngo_name: str = Field(..., example="Helping Hands Foundation")
+    donor_name: str = Field(..., example="John Doe")
+    donor_email: EmailStr = Field(..., example="john@example.com")
+    amount_donated: float = Field(..., example=1500.0)
+    mode_of_payment: str = Field(..., example="UPI")
+    reference_no: Optional[str] = Field(None, example="TXN2025ABC123")
+    purpose_of_donation: Optional[str] = Field(None, example="Children’s Education")
+    amount_in_words: str = Field(..., example="INR 1500 Only")
+    platform_details: dict = Field(..., example={
+        "company": "Helping Hands Foundation",
+        "gstin": "27AABCC1234D1Z2",
+        "address": "45-A, Lajpat Nagar, New Delhi - 110024",
+        "email": "john@example.com",
+        "phone": "+91-9876543210"
+        })
+
+    class Config:
+        from_attributes = True
+
+class PlatformBillOut(BaseModel):
+    receipt_no: int = Field(..., example=2025)
+    payment_date: str = Field(..., example="06-Oct-2025")
+    ngo_name: str = Field(..., example="Helping Hands Foundation")
+    gst: Optional[float] = Field(0.0, example=270.0)
+    amount: float = Field(..., example=1500.0)
+    pay_mode: str = Field(..., example="Credit Card")
+    finalTotal: str = Field(..., example="1770.00")
+    email: EmailStr = Field(..., example="john@example.com")
+    platform_details: dict = Field(..., example={
+        "company": "Helping Hands Foundation",
+        "gstin": "27AABCC1234D1Z2",
+        "address": "45-A, Lajpat Nagar, New Delhi - 110024",
+        "email": "john@example.com",
+        "phone": "+91-9876543210"
+        })
+
+    class Config:
+        from_attributes = True
+
+class ToggleSavedOut(BaseModel):
+    success: bool
+    saved: bool
+    donation_id: int
+
+    class Config:
+        from_attributes = True
+
+class DonationExportItem(BaseModel):
+    id: int
+    amount: float
+    status: Optional[str]
+    method: Optional[str]
+    created_at: str
+
+    class Config:
+        from_attributes = True
+
+
+class DonationExportOut(BaseModel):
+    total_items: int
+    donations: List[DonationExportItem]
+
+    class Config:
+        from_attributes = True
+
 # --------------------------------------------
 # Points and Badges
 # --------------------------------------------
@@ -342,36 +444,43 @@ class DoctorProfileOut(BaseModel):
     specialties: str
     class Config:
         from_attributes = True
+    
+# --------------------------------------------
+# Patients
+# --------------------------------------------
 
-class HealthIssueOut(BaseModel):
+class PatientCreate(BaseModel):
+    first_name: str
+    last_name: str
+    gender: str
+    age: int
+    relation: Optional[str] = None
+
+class PatientUpdate(BaseModel):
+    model_config = {"extra": "forbid"}  # Optional: reject unknown fields
+    
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    gender: Optional[str] = None
+    age: Optional[int] = None
+    relation: Optional[str] = None
+
+class PatientResponse(BaseModel):
     id: int
-    name: str
+    user_id: int
+    first_name: str
+    last_name: str
+    gender: str
+    age: int
+    relation: Optional[str] = None
+
     class Config:
         from_attributes = True
-        
-class DoctorAppointmentOut(BaseModel):
-    id: int
-    doctor_id: str
-    name: str
-    specialization: Optional[str]
-    experience_years: Optional[int]
-    gender: Optional[str]
-    rating: Optional[float]
-    order_id: str
-    appointment_date: date
-    appointment_start_time: time
-    appointment_end_time: time
-    created_at: Optional[datetime]
-    location: Optional[str]
-    distance_km: Optional[float]
-    travel_time_mins: Optional[int]
-    clinic_fee: Optional[float]
-    home_fee: Optional[float]
-    status: str
 
-    class Config:
-        from_attributes = True
 
+# --------------------------------------------
+# Cart
+# --------------------------------------------
 class CartItemBase(BaseModel):
     medicine_id: str
     quantity: int = 1
@@ -389,8 +498,151 @@ class CartItemUpdate(BaseModel):
 
 class CartItemOut(CartItemBase):
     id: int
-    created_at: Optional[datetime]
-    updated_at: Optional[datetime]
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
+        
+# --------------------------------------------
+# Wallet
+# --------------------------------------------
+
+class WalletAddBalance(BaseModel):
+    user_name: str
+    amount: Decimal
+    order_id: Optional[str] = None
+
+class WalletTransactionOut(BaseModel):
+    id: int
+    user_id: int
+    order_id: Optional[str] = None
+    tranx_id: str
+    amount: Decimal
+    transaction_type: str
+    points_earned: Decimal
+    current_balance: Decimal
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class WalletBalanceOut(BaseModel):
+    balance: Decimal
+    last_updated: datetime
+
+class WalletHistoryOut(BaseModel):
+    transactions: List[WalletTransactionOut]
+    total: int
+
+# --------------------------------------------
+# Appointments
+# --------------------------------------------
+class HealthIssueOut(BaseModel):
+    id: int
+    name: str
+
+    class Config:
+        from_attributes = True
+
+class SpecializationOut(BaseModel):
+    id: int
+    name: str
+
+    class Config:
+        from_attributes = True
+
+class DoctorAppointmentBase(BaseModel):
+    address_id: int
+    health_issues: Optional[List[int]] = None
+    specialization_ids: Optional[List[int]] = None
+    description: Optional[str] = None
+    consultation_type: Optional[str] = None   # "clinic_visit" | "home_visit"
+    service_type: Optional[str] = None        # "emergency" | "normal"
+    preferred_date_time: Optional[datetime] = None
+    budget: Optional[float] = None
+    status: str = "Pending"  # "Pending", "Confirmed", "Completed", "Cancelled"
+
+class DoctorAppointmentUpdate(BaseModel):
+    address_id: Optional[int]
+    description: Optional[str]
+    consultation_type: Optional[str]
+    service_type: Optional[str]
+    preferred_date_time: Optional[datetime]
+    budget: Optional[float]
+    health_issues: Optional[List[int]] = []
+    specialization_ids: Optional[List[int]] = []
+    
+class DoctorAppointmentCreate(DoctorAppointmentBase):
+    pass
+
+class DoctorAppointmentResponse(BaseModel):
+    id: int
+    description: Optional[str]
+    consultation_type: Optional[str]
+    service_type: Optional[str]
+    preferred_date_time: Optional[datetime]
+    budget: Optional[float]
+    status: str
+    created_at: Optional[datetime]
+
+    # Nested objects instead of just IDs
+    address: Optional[AddressOut]
+    health_issues: List[HealthIssueOut] = []
+    specializations: List[SpecializationOut] = []
+
+    class Config:
+        from_attributes = True
+
+# --------------------------------------------
+# App Settings
+# --------------------------------------------
+
+class NotificationSettingsOut(BaseModel):
+    inapp_notifications: bool
+    email_notifications: bool
+    push_notifications: bool
+    regulatory_alerts: bool
+    promotions_and_offers: bool
+    location_notification: bool 
+    payment_notifications: bool
+    quite_mode: bool
+    quite_mode_start_time: Optional[time] = None
+    quite_mode_end_time: Optional[time] = None
+
+class NotificationSettingsUpdate(BaseModel):
+    inapp_notifications: Optional[bool] = None
+    email_notifications: Optional[bool] = None
+    push_notifications: Optional[bool] = None
+    regulatory_alerts: Optional[bool] = None
+    promotions_and_offers: Optional[bool] = None
+    location_notification: Optional[bool] = None
+    payment_notifications: Optional[bool] = None
+    quite_mode: Optional[bool] = None
+    quite_mode_start_time: Optional[time] = None
+    quite_mode_end_time: Optional[time] = None
+
+# --------------------------------------------
+# Purchase
+# --------------------------------------------
+
+class ConcernListOut(BaseModel):
+    id: int
+    category: str
+
+    class Config:
+        from_attributes = True  
+
+class TopSellingCategoryOut(BaseModel):
+    id: int
+    category: str
+
+    class Config:
+        from_attributes = True
+
+class CancelReasonOut(BaseModel):
+    id: int
+    reason: str
+
+    class Config:
+        from_attributes = True
